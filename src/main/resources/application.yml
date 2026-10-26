@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: mecano
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:mecano}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+app:
+  security:
+    jwt:
+      secret: ${JWT_SECRET}
+      expiration: ${JWT_EXPIRATION:PT1H}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  jpa:
+    show-sql: true
+
+logging:
+  level:
+    br.dev.lucasaguiar.mecano: DEBUG
+
+---
+# Datasource fornecido pelo Testcontainers (@ServiceConnection).
+spring:
+  config:
+    activate:
+      on-profile: test
+
+app:
+  security:
+    jwt:
+      secret: test-secret-only-for-automated-tests-0123456789

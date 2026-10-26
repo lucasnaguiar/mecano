@@ -1,0 +1,3 @@
+-- Schema inicial. Tabelas previstas:
+-- customer, vehicle, labor_operation, part, stock_movement,
+-- work_order, labor_item, part_item, estimate, status_transition, app_user.
