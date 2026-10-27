@@ -6,5 +6,6 @@ package br.dev.lucasaguiar.mecano.auth.domain;
 public enum Role {
 	ADMIN,
 	ATTENDANT,
-	MECHANIC
+	MECHANIC,
+	STOCK_MANAGER
 }
