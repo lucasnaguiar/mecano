@@ -3,6 +3,7 @@ package br.dev.lucasaguiar.mecano.auth.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import br.dev.lucasaguiar.mecano.shared.domain.UserId;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 

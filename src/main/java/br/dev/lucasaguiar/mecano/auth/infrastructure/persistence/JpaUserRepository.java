@@ -1,8 +1,8 @@
 package br.dev.lucasaguiar.mecano.auth.infrastructure.persistence;
 
 import br.dev.lucasaguiar.mecano.auth.domain.User;
-import br.dev.lucasaguiar.mecano.auth.domain.UserId;
 import br.dev.lucasaguiar.mecano.auth.domain.UserRepository;
+import br.dev.lucasaguiar.mecano.shared.domain.UserId;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
 

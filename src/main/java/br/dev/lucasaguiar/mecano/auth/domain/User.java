@@ -1,5 +1,6 @@
 package br.dev.lucasaguiar.mecano.auth.domain;
 
+import br.dev.lucasaguiar.mecano.shared.domain.UserId;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;

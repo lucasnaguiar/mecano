@@ -1,10 +1,10 @@
-package br.dev.lucasaguiar.mecano.auth.domain;
+package br.dev.lucasaguiar.mecano.shared.domain;
 
 import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Identificador de User.
+ * Identificador do usuário da equipe. Fica em shared para que outros contextos o referenciem sem depender de auth.
  */
 public record UserId(UUID value) {
 
