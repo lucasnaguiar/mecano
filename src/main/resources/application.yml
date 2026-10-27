@@ -18,6 +18,10 @@ app:
     jwt:
       secret: ${JWT_SECRET}
       expiration: ${JWT_EXPIRATION:PT1H}
+    admin:
+      name: ${ADMIN_NAME:Administrador}
+      email: ${ADMIN_EMAIL:}
+      password: ${ADMIN_PASSWORD:}
 
 springdoc:
   swagger-ui:

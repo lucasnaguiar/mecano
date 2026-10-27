@@ -29,6 +29,9 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-PT1H}
+      ADMIN_NAME: ${ADMIN_NAME:-Administrador}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     ports:
       - "${APP_PORT:-8080}:8080"
 
