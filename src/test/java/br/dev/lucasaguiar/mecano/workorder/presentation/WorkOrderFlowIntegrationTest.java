@@ -160,6 +160,29 @@ class WorkOrderFlowIntegrationTest extends ApiIntegrationTest {
 				.andExpect(status().isForbidden());
 	}
 
+	@Test
+	void listsWorkOrdersOfCustomerAndVehicle() throws Exception {
+		String id = read(perform(post("/api/admin/work-orders"), """
+				{"customerId": "%s", "vehicleId": "%s", "problemDescription": "Barulho na suspensão"}
+				""".formatted(customerId, vehicleId)), "$.id");
+
+		perform(get("/api/admin/customers/" + customerId + "/work-orders"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.totalElements").value(1))
+				.andExpect(jsonPath("$.content[0].id").value(id));
+		perform(get("/api/admin/vehicles/" + vehicleId + "/work-orders"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.content[0].id").value(id));
+
+		var unknown = "/00000000-0000-0000-0000-000000000000/work-orders";
+		perform(get("/api/admin/customers" + unknown))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.detail").value("Cliente não encontrado."));
+		perform(get("/api/admin/vehicles" + unknown))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.detail").value("Veículo não encontrado."));
+	}
+
 	private String registerPart(String prefix, String name, String type, String unit, String price, String stock)
 			throws Exception {
 		String id = read(perform(post("/api/admin/parts"), """

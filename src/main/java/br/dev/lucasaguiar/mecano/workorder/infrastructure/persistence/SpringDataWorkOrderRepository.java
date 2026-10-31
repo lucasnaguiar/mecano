@@ -16,6 +16,10 @@ interface SpringDataWorkOrderRepository extends JpaRepository<WorkOrderEntity, U
 
 	Page<WorkOrderEntity> findByStatus(WorkOrderStatus status, Pageable pageable);
 
+	Page<WorkOrderEntity> findByCustomerId(UUID customerId, Pageable pageable);
+
+	Page<WorkOrderEntity> findByVehicleId(UUID vehicleId, Pageable pageable);
+
 	boolean existsByVehicleIdAndStatusNot(UUID vehicleId, WorkOrderStatus status);
 
 	/**

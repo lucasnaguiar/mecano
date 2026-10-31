@@ -68,6 +68,18 @@ public class JpaWorkOrderRepository implements WorkOrderRepository {
 	}
 
 	@Override
+	public Page<WorkOrder> findByCustomer(CustomerId customerId, PageQuery query) {
+		return Pages.toPage(springDataRepository.findByCustomerId(customerId.value(),
+				Pages.toPageable(query, NEWEST_FIRST)), JpaWorkOrderRepository::toDomain);
+	}
+
+	@Override
+	public Page<WorkOrder> findByVehicle(VehicleId vehicleId, PageQuery query) {
+		return Pages.toPage(springDataRepository.findByVehicleId(vehicleId.value(),
+				Pages.toPageable(query, NEWEST_FIRST)), JpaWorkOrderRepository::toDomain);
+	}
+
+	@Override
 	public boolean hasOpenWorkOrder(VehicleId vehicleId) {
 		return springDataRepository.existsByVehicleIdAndStatusNot(vehicleId.value(), WorkOrderStatus.DELIVERED);
 	}
