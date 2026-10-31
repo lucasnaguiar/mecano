@@ -4,10 +4,20 @@ package br.dev.lucasaguiar.mecano.workorder.domain;
  * Status da ordem de serviço.
  */
 public enum WorkOrderStatus {
-	RECEIVED,
-	IN_DIAGNOSIS,
-	AWAITING_APPROVAL,
-	IN_PROGRESS,
-	COMPLETED,
-	DELIVERED
+	RECEIVED("Recebida"),
+	IN_DIAGNOSIS("Em diagnóstico"),
+	AWAITING_APPROVAL("Aguardando aprovação"),
+	IN_PROGRESS("Em execução"),
+	COMPLETED("Finalizada"),
+	DELIVERED("Entregue");
+
+	private final String label;
+
+	WorkOrderStatus(String label) {
+		this.label = label;
+	}
+
+	public String label() {
+		return label;
+	}
 }
