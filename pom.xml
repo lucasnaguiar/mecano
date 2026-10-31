@@ -31,8 +31,8 @@
 		<spring-modulith.version>2.1.1</spring-modulith.version>
 		<springdoc.version>3.2.0</springdoc.version>
 		<jacoco.version>0.8.16</jacoco.version>
-		<!-- Mudar para true quando houver testes de domínio (meta: 80% nos domínios críticos). -->
-		<jacoco.haltOnFailure>false</jacoco.haltOnFailure>
+		<!-- Build falha se os domínios críticos ficarem abaixo de 80% de cobertura de linhas. -->
+		<jacoco.haltOnFailure>true</jacoco.haltOnFailure>
 	</properties>
 	<dependencies>
 		<dependency>
