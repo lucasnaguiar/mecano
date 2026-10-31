@@ -10,6 +10,8 @@ import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 @PersistenceTest
 class InventoryPersistenceTest {
@@ -38,7 +40,7 @@ class InventoryPersistenceTest {
 		parts.save(part("PASTILHA-01", PartType.PART, "UN", "1", "4"));
 		parts.save(part("VELA-01", PartType.PART, "UN", "20", "4"));
 
-		assertThat(parts.findAtOrBelowMinimumStock())
+		assertThat(parts.findAtOrBelowMinimumStock(PageRequest.of(0, 10, Sort.by("name"))))
 				.extracting(PartEntity::getCode)
 				.containsExactly("FILTRO-01", "PASTILHA-01");
 	}

@@ -3,8 +3,10 @@ package br.dev.lucasaguiar.mecano.customer.infrastructure.persistence;
 import br.dev.lucasaguiar.mecano.customer.domain.customer.Customer;
 import br.dev.lucasaguiar.mecano.customer.domain.customer.CustomerId;
 import br.dev.lucasaguiar.mecano.customer.domain.customer.CustomerRepository;
+import br.dev.lucasaguiar.mecano.shared.domain.Page;
+import br.dev.lucasaguiar.mecano.shared.domain.PageQuery;
 import br.dev.lucasaguiar.mecano.shared.domain.TaxId;
-import java.util.List;
+import br.dev.lucasaguiar.mecano.shared.infrastructure.persistence.Pages;
 import java.util.Optional;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
@@ -42,8 +44,9 @@ public class JpaCustomerRepository implements CustomerRepository {
 	}
 
 	@Override
-	public List<Customer> findAll() {
-		return springDataRepository.findAll(Sort.by("name")).stream().map(JpaCustomerRepository::toDomain).toList();
+	public Page<Customer> findAll(PageQuery query) {
+		return Pages.toPage(springDataRepository.findAll(Pages.toPageable(query, Sort.by("name", "id"))),
+				JpaCustomerRepository::toDomain);
 	}
 
 	@Override

@@ -61,8 +61,8 @@ class PartApiIntegrationTest extends ApiIntegrationTest {
 				.andExpect(status().isCreated());
 		String id = read(created, "$.id");
 
-		perform(get("/api/admin/parts").param("atOrBelowMinimum", "true"))
-				.andExpect(jsonPath("$[*].id", Matchers.hasItem(id)));
+		perform(get("/api/admin/parts").param("atOrBelowMinimum", "true").param("size", "100"))
+				.andExpect(jsonPath("$.content[*].id", Matchers.hasItem(id)));
 
 		perform(post("/api/admin/parts/" + id + "/entries"), """
 				{"quantity": 1.5}
@@ -70,7 +70,8 @@ class PartApiIntegrationTest extends ApiIntegrationTest {
 				.andExpect(status().isBadRequest());
 
 		perform(delete("/api/admin/parts/" + id)).andExpect(status().isNoContent());
-		perform(get("/api/admin/parts")).andExpect(jsonPath("$[*].id", Matchers.not(Matchers.hasItem(id))));
+		perform(get("/api/admin/parts").param("size", "100"))
+				.andExpect(jsonPath("$.content[*].id", Matchers.not(Matchers.hasItem(id))));
 	}
 
 	@Test

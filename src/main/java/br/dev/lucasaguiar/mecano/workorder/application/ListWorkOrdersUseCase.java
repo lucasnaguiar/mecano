@@ -1,14 +1,15 @@
 package br.dev.lucasaguiar.mecano.workorder.application;
 
+import br.dev.lucasaguiar.mecano.shared.domain.Page;
+import br.dev.lucasaguiar.mecano.shared.domain.PageQuery;
 import br.dev.lucasaguiar.mecano.workorder.domain.WorkOrder;
 import br.dev.lucasaguiar.mecano.workorder.domain.WorkOrderRepository;
 import br.dev.lucasaguiar.mecano.workorder.domain.WorkOrderStatus;
-import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Lista as OS, opcionalmente filtradas por status, das mais recentes para as mais antigas.
+ * Lista as OS, opcionalmente filtradas por status, das mais recentes para as mais antigas, paginadas.
  */
 @Service
 public class ListWorkOrdersUseCase {
@@ -20,7 +21,7 @@ public class ListWorkOrdersUseCase {
 	}
 
 	@Transactional(readOnly = true)
-	public List<WorkOrder> execute(WorkOrderStatus status) {
-		return workOrderRepository.findAll(status);
+	public Page<WorkOrder> execute(WorkOrderStatus status, PageQuery query) {
+		return workOrderRepository.findAll(status, query);
 	}
 }

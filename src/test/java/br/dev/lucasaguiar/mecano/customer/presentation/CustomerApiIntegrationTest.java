@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.dev.lucasaguiar.mecano.ApiIntegrationTest;
 import br.dev.lucasaguiar.mecano.TestData;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
 
 class CustomerApiIntegrationTest extends ApiIntegrationTest {
@@ -33,7 +34,8 @@ class CustomerApiIntegrationTest extends ApiIntegrationTest {
 
 		perform(get("/api/admin/customers").param("taxId", formattedCpf))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$[0].id").value(customerId));
+				.andExpect(jsonPath("$.content[0].id").value(customerId))
+				.andExpect(jsonPath("$.totalElements").value(1));
 
 		perform(put("/api/admin/customers/" + customerId), """
 				{"name": "Ana Lima", "email": null, "phone": "1133334444"}
@@ -87,5 +89,28 @@ class CustomerApiIntegrationTest extends ApiIntegrationTest {
 				""")
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.detail").value("Cliente não encontrado."));
+	}
+
+	@Test
+	void paginatesCustomers() throws Exception {
+		for (var i = 0; i < 3; i++) {
+			perform(post("/api/admin/customers"), """
+					{"name": "Cliente %d", "taxId": "%s"}
+					""".formatted(i, TestData.randomCpf()))
+					.andExpect(status().isCreated());
+		}
+
+		perform(get("/api/admin/customers").param("page", "1").param("size", "2"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.page").value(1))
+				.andExpect(jsonPath("$.size").value(2))
+				.andExpect(jsonPath("$.content.length()").value(Matchers.lessThanOrEqualTo(2)))
+				.andExpect(jsonPath("$.totalElements").value(Matchers.greaterThanOrEqualTo(3)))
+				.andExpect(jsonPath("$.totalPages").value(Matchers.greaterThanOrEqualTo(2)));
+
+		perform(get("/api/admin/customers").param("size", "0"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.detail").value("O tamanho da página deve estar entre 1 e 100."));
+		perform(get("/api/admin/customers").param("page", "abc")).andExpect(status().isBadRequest());
 	}
 }

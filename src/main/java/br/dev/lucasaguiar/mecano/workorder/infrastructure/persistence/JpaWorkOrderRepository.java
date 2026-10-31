@@ -5,9 +5,12 @@ import br.dev.lucasaguiar.mecano.customer.domain.customer.CustomerId;
 import br.dev.lucasaguiar.mecano.customer.domain.vehicle.VehicleId;
 import br.dev.lucasaguiar.mecano.inventory.domain.PartId;
 import br.dev.lucasaguiar.mecano.shared.domain.Money;
+import br.dev.lucasaguiar.mecano.shared.domain.Page;
+import br.dev.lucasaguiar.mecano.shared.domain.PageQuery;
 import br.dev.lucasaguiar.mecano.shared.domain.Quantity;
 import br.dev.lucasaguiar.mecano.shared.domain.UnitOfMeasure;
 import br.dev.lucasaguiar.mecano.shared.domain.UserId;
+import br.dev.lucasaguiar.mecano.shared.infrastructure.persistence.Pages;
 import br.dev.lucasaguiar.mecano.workorder.domain.Estimate;
 import br.dev.lucasaguiar.mecano.workorder.domain.LaborItem;
 import br.dev.lucasaguiar.mecano.workorder.domain.PartItem;
@@ -22,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -30,6 +34,8 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public class JpaWorkOrderRepository implements WorkOrderRepository {
+
+	private static final Sort NEWEST_FIRST = Sort.by(Sort.Order.desc("createdAt"), Sort.Order.asc("id"));
 
 	private final SpringDataWorkOrderRepository springDataRepository;
 
@@ -53,11 +59,12 @@ public class JpaWorkOrderRepository implements WorkOrderRepository {
 	}
 
 	@Override
-	public List<WorkOrder> findAll(WorkOrderStatus status) {
+	public Page<WorkOrder> findAll(WorkOrderStatus status, PageQuery query) {
+		var pageable = Pages.toPageable(query, NEWEST_FIRST);
 		var entities = status == null
-				? springDataRepository.findAllByOrderByCreatedAtDesc()
-				: springDataRepository.findByStatusOrderByCreatedAtDesc(status);
-		return entities.stream().map(JpaWorkOrderRepository::toDomain).toList();
+				? springDataRepository.findAll(pageable)
+				: springDataRepository.findByStatus(status, pageable);
+		return Pages.toPage(entities, JpaWorkOrderRepository::toDomain);
 	}
 
 	@Override

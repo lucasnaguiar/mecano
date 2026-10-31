@@ -5,6 +5,8 @@ import br.dev.lucasaguiar.mecano.customer.domain.customer.CustomerId;
 import br.dev.lucasaguiar.mecano.customer.domain.vehicle.VehicleId;
 import br.dev.lucasaguiar.mecano.inventory.domain.PartId;
 import br.dev.lucasaguiar.mecano.shared.presentation.AuthenticatedUser;
+import br.dev.lucasaguiar.mecano.shared.presentation.PageParams;
+import br.dev.lucasaguiar.mecano.shared.presentation.PageResponse;
 import br.dev.lucasaguiar.mecano.workorder.application.AddLaborUseCase;
 import br.dev.lucasaguiar.mecano.workorder.application.AddPartUseCase;
 import br.dev.lucasaguiar.mecano.workorder.application.CompleteWorkOrderUseCase;
@@ -28,7 +30,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -93,8 +94,9 @@ public class WorkOrderAdminController {
 
 	@GetMapping
 	@Operation(summary = "Lista as ordens de serviço, opcionalmente por status")
-	public List<WorkOrderResponse> list(@RequestParam(required = false) WorkOrderStatus status) {
-		return listWorkOrdersUseCase.execute(status).stream().map(WorkOrderResponse::from).toList();
+	public PageResponse<WorkOrderResponse> list(@RequestParam(required = false) WorkOrderStatus status,
+			PageParams pageParams) {
+		return PageResponse.from(listWorkOrdersUseCase.execute(status, pageParams.toQuery()), WorkOrderResponse::from);
 	}
 
 	@GetMapping("/{id}")

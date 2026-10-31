@@ -16,6 +16,8 @@ import br.dev.lucasaguiar.mecano.inventory.presentation.dto.StockEntryRequest;
 import br.dev.lucasaguiar.mecano.inventory.presentation.dto.StockMovementResponse;
 import br.dev.lucasaguiar.mecano.inventory.presentation.dto.UpdatePartRequest;
 import br.dev.lucasaguiar.mecano.shared.presentation.AuthenticatedUser;
+import br.dev.lucasaguiar.mecano.shared.presentation.PageParams;
+import br.dev.lucasaguiar.mecano.shared.presentation.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -74,9 +76,10 @@ public class PartController {
 
 	@GetMapping
 	@Operation(summary = "Lista peças e insumos")
-	public List<PartResponse> list(@RequestParam(defaultValue = "false") boolean includeInactive,
-			@RequestParam(defaultValue = "false") boolean atOrBelowMinimum) {
-		return listPartsUseCase.execute(includeInactive, atOrBelowMinimum).stream().map(PartResponse::from).toList();
+	public PageResponse<PartResponse> list(@RequestParam(defaultValue = "false") boolean includeInactive,
+			@RequestParam(defaultValue = "false") boolean atOrBelowMinimum, PageParams pageParams) {
+		return PageResponse.from(listPartsUseCase.execute(includeInactive, atOrBelowMinimum, pageParams.toQuery()),
+				PartResponse::from);
 	}
 
 	@GetMapping("/{id}")

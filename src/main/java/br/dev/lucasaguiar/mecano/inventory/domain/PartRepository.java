@@ -1,6 +1,7 @@
 package br.dev.lucasaguiar.mecano.inventory.domain;
 
-import java.util.List;
+import br.dev.lucasaguiar.mecano.shared.domain.Page;
+import br.dev.lucasaguiar.mecano.shared.domain.PageQuery;
 import java.util.Optional;
 
 /**
@@ -14,7 +15,9 @@ public interface PartRepository {
 
 	Optional<Part> findByCode(String code);
 
-	List<Part> findAll(boolean includeInactive);
+	/** Lista as peças em ordem alfabética, opcionalmente incluindo as desativadas. */
+	Page<Part> findAll(boolean includeInactive, PageQuery query);
 
-	List<Part> findAtOrBelowMinimumStock();
+	/** Lista as peças ativas cujo saldo disponível está no estoque mínimo ou abaixo dele. */
+	Page<Part> findAtOrBelowMinimumStock(PageQuery query);
 }

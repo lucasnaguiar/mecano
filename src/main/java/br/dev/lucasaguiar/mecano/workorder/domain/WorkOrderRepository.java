@@ -1,8 +1,9 @@
 package br.dev.lucasaguiar.mecano.workorder.domain;
 
 import br.dev.lucasaguiar.mecano.customer.domain.vehicle.VehicleId;
+import br.dev.lucasaguiar.mecano.shared.domain.Page;
+import br.dev.lucasaguiar.mecano.shared.domain.PageQuery;
 import java.time.Duration;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -17,7 +18,7 @@ public interface WorkOrderRepository {
 	Optional<WorkOrder> findByTrackingCode(TrackingCode trackingCode);
 
 	/** Lista as OS do status informado, ou todas quando nulo, das mais recentes para as mais antigas. */
-	List<WorkOrder> findAll(WorkOrderStatus status);
+	Page<WorkOrder> findAll(WorkOrderStatus status, PageQuery query);
 
 	/** Indica se o veículo já tem uma OS ainda não entregue. */
 	boolean hasOpenWorkOrder(VehicleId vehicleId);

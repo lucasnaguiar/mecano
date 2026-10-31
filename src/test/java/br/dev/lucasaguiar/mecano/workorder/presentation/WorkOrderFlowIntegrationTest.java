@@ -112,7 +112,7 @@ class WorkOrderFlowIntegrationTest extends ApiIntegrationTest {
 				.andExpect(jsonPath("$.estimates.length()").value(2));
 
 		perform(get("/api/admin/work-orders").param("status", "DELIVERED"))
-				.andExpect(jsonPath("$[*].id", Matchers.hasItem(id)));
+				.andExpect(jsonPath("$.content[*].id", Matchers.hasItem(id)));
 		perform(get("/api/admin/reports/average-execution-time"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.averageSeconds").isNumber());

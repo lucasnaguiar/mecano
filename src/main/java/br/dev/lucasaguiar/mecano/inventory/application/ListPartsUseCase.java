@@ -2,7 +2,8 @@ package br.dev.lucasaguiar.mecano.inventory.application;
 
 import br.dev.lucasaguiar.mecano.inventory.domain.Part;
 import br.dev.lucasaguiar.mecano.inventory.domain.PartRepository;
-import java.util.List;
+import br.dev.lucasaguiar.mecano.shared.domain.Page;
+import br.dev.lucasaguiar.mecano.shared.domain.PageQuery;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,7 +20,9 @@ public class ListPartsUseCase {
 	}
 
 	@Transactional(readOnly = true)
-	public List<Part> execute(boolean includeInactive, boolean atOrBelowMinimumOnly) {
-		return atOrBelowMinimumOnly ? partRepository.findAtOrBelowMinimumStock() : partRepository.findAll(includeInactive);
+	public Page<Part> execute(boolean includeInactive, boolean atOrBelowMinimumOnly, PageQuery query) {
+		return atOrBelowMinimumOnly
+				? partRepository.findAtOrBelowMinimumStock(query)
+				: partRepository.findAll(includeInactive, query);
 	}
 }

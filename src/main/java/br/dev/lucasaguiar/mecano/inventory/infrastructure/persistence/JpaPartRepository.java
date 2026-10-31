@@ -4,9 +4,12 @@ import br.dev.lucasaguiar.mecano.inventory.domain.Part;
 import br.dev.lucasaguiar.mecano.inventory.domain.PartId;
 import br.dev.lucasaguiar.mecano.inventory.domain.PartRepository;
 import br.dev.lucasaguiar.mecano.shared.domain.Money;
+import br.dev.lucasaguiar.mecano.shared.domain.Page;
+import br.dev.lucasaguiar.mecano.shared.domain.PageQuery;
 import br.dev.lucasaguiar.mecano.shared.domain.UnitOfMeasure;
-import java.util.List;
+import br.dev.lucasaguiar.mecano.shared.infrastructure.persistence.Pages;
 import java.util.Optional;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -14,6 +17,8 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public class JpaPartRepository implements PartRepository {
+
+	private static final Sort BY_NAME = Sort.by("name", "id");
 
 	private final SpringDataPartRepository springDataRepository;
 
@@ -37,16 +42,18 @@ public class JpaPartRepository implements PartRepository {
 	}
 
 	@Override
-	public List<Part> findAll(boolean includeInactive) {
+	public Page<Part> findAll(boolean includeInactive, PageQuery query) {
+		var pageable = Pages.toPageable(query, BY_NAME);
 		var entities = includeInactive
-				? springDataRepository.findAllByOrderByName()
-				: springDataRepository.findByActiveTrueOrderByName();
-		return entities.stream().map(JpaPartRepository::toDomain).toList();
+				? springDataRepository.findAll(pageable)
+				: springDataRepository.findByActiveTrue(pageable);
+		return Pages.toPage(entities, JpaPartRepository::toDomain);
 	}
 
 	@Override
-	public List<Part> findAtOrBelowMinimumStock() {
-		return springDataRepository.findAtOrBelowMinimumStock().stream().map(JpaPartRepository::toDomain).toList();
+	public Page<Part> findAtOrBelowMinimumStock(PageQuery query) {
+		return Pages.toPage(springDataRepository.findAtOrBelowMinimumStock(Pages.toPageable(query, BY_NAME)),
+				JpaPartRepository::toDomain);
 	}
 
 	private static PartEntity toEntity(Part part) {

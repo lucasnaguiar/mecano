@@ -1,9 +1,10 @@
 package br.dev.lucasaguiar.mecano.workorder.infrastructure.persistence;
 
 import br.dev.lucasaguiar.mecano.workorder.domain.WorkOrderStatus;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -13,13 +14,7 @@ interface SpringDataWorkOrderRepository extends JpaRepository<WorkOrderEntity, U
 
 	Optional<WorkOrderEntity> findByTrackingCode(String trackingCode);
 
-	List<WorkOrderEntity> findByStatusOrderByCreatedAt(WorkOrderStatus status);
-
-	List<WorkOrderEntity> findByCustomerIdOrderByCreatedAtDesc(UUID customerId);
-
-	List<WorkOrderEntity> findByStatusOrderByCreatedAtDesc(WorkOrderStatus status);
-
-	List<WorkOrderEntity> findAllByOrderByCreatedAtDesc();
+	Page<WorkOrderEntity> findByStatus(WorkOrderStatus status, Pageable pageable);
 
 	boolean existsByVehicleIdAndStatusNot(UUID vehicleId, WorkOrderStatus status);
 

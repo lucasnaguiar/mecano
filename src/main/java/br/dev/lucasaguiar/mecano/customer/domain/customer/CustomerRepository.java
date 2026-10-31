@@ -1,7 +1,8 @@
 package br.dev.lucasaguiar.mecano.customer.domain.customer;
 
+import br.dev.lucasaguiar.mecano.shared.domain.Page;
+import br.dev.lucasaguiar.mecano.shared.domain.PageQuery;
 import br.dev.lucasaguiar.mecano.shared.domain.TaxId;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -17,7 +18,8 @@ public interface CustomerRepository {
 
 	boolean existsByTaxId(TaxId taxId);
 
-	List<Customer> findAll();
+	/** Lista os clientes em ordem alfabética. */
+	Page<Customer> findAll(PageQuery query);
 
 	void delete(CustomerId id);
 }

@@ -11,6 +11,8 @@ import br.dev.lucasaguiar.mecano.customer.presentation.dto.CreateCustomerRequest
 import br.dev.lucasaguiar.mecano.customer.presentation.dto.CustomerResponse;
 import br.dev.lucasaguiar.mecano.customer.presentation.dto.UpdateCustomerRequest;
 import br.dev.lucasaguiar.mecano.customer.presentation.dto.VehicleResponse;
+import br.dev.lucasaguiar.mecano.shared.presentation.PageParams;
+import br.dev.lucasaguiar.mecano.shared.presentation.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -64,9 +66,10 @@ public class CustomerController {
 
 	@GetMapping
 	@Operation(summary = "Lista os clientes ou busca pelo CPF/CNPJ")
-	public List<CustomerResponse> list(
-			@Parameter(description = "CPF ou CNPJ, com ou sem pontuação") @RequestParam(required = false) String taxId) {
-		return listCustomersUseCase.execute(taxId).stream().map(CustomerResponse::from).toList();
+	public PageResponse<CustomerResponse> list(
+			@Parameter(description = "CPF ou CNPJ, com ou sem pontuação") @RequestParam(required = false) String taxId,
+			PageParams pageParams) {
+		return PageResponse.from(listCustomersUseCase.execute(taxId, pageParams.toQuery()), CustomerResponse::from);
 	}
 
 	@GetMapping("/{id}")
