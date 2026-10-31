@@ -48,8 +48,8 @@ Relações entre contextos:
 | Termo | Código | Tipo | Definição |
 |---|---|---|---|
 | Ordem de Serviço (OS) | `WorkOrder` | Agregado (raiz) | Registro de um atendimento a um veículo, desde a entrada na oficina até a entrega ao cliente. Concentra serviços, peças, orçamento e histórico de status. |
-| Número da OS | `WorkOrderNumber` | Objeto de valor | Número sequencial e legível usado pela equipe para se referir à OS (ex.: OS 1532). |
-| Código de acompanhamento | `TrackingCode` | Objeto de valor | Código aleatório e difícil de adivinhar que o cliente usa para consultar e aprovar a OS sem acesso administrativo. |
+| Número da OS | `number` | Atributo | Número sequencial e legível usado pela equipe para se referir à OS (ex.: OS 1000). Gerado pelo banco na abertura. |
+| Código de acompanhamento | `TrackingCode` | Objeto de valor | Código aleatório de 12 caracteres, sem caracteres ambíguos (0, O, 1, I), que o cliente usa para consultar e responder o orçamento sem acesso administrativo. |
 | Descrição do problema | `problemDescription` | Atributo | Relato do cliente sobre o defeito, registrado na abertura da OS. |
 | Diagnóstico | `diagnosis` | Etapa | Análise feita pelo mecânico para identificar os serviços e as peças necessários. |
 | Item de serviço | `LaborItem` | Entidade (interna) | Serviço do catálogo incluído na OS, com preço e descrição copiados no momento da inclusão. |
@@ -57,7 +57,7 @@ Relações entre contextos:
 | Orçamento | `Estimate` | Entidade (interna) | Proposta de valor enviada ao cliente, calculada pela soma dos itens da OS. Pode ser aprovado ou rejeitado. |
 | Valor total | `totalAmount` | Objeto de valor (`Money`) | Soma dos subtotais de todos os itens da OS. É recalculado sempre que um item é incluído ou removido. |
 | Transição de status | `StatusTransition` | Entidade (interna) | Registro de cada mudança de status da OS, com status anterior, novo status, data, hora e usuário. Base para o tempo médio de execução. |
-| Tempo médio de execução | `AverageExecutionTime` | Modelo de leitura | Média do tempo entre `IN_PROGRESS` e `COMPLETED` das OS finalizadas. |
+| Tempo médio de execução | `GetAverageExecutionTimeUseCase` | Modelo de leitura | Média do tempo entre `IN_PROGRESS` e `COMPLETED` das OS finalizadas. |
 
 ### Status da Ordem de Serviço
 
@@ -79,7 +79,9 @@ RECEIVED → IN_DIAGNOSIS → AWAITING_APPROVAL → IN_PROGRESS → COMPLETED �
 - O status nunca é alterado diretamente. Ele muda apenas como consequência de um comando do negócio.
 - Serviços e peças só podem ser incluídos em `IN_DIAGNOSIS`.
 - Uma OS em `DELIVERED` não pode voltar a nenhum status anterior.
-- O destino da OS após a rejeição do orçamento está em aberto (ver [Decisões em aberto](#decisões-em-aberto)).
+- A aprovação do orçamento não muda o status: a OS continua em `AWAITING_APPROVAL`, com o orçamento `APPROVED`, até o mecânico iniciar a execução.
+- A rejeição do orçamento devolve a OS para `IN_DIAGNOSIS`, onde os itens podem ser ajustados e um novo orçamento enviado.
+- Um veículo não pode ter mais de uma OS aberta (não entregue) ao mesmo tempo.
 
 ### Situação do orçamento
 
@@ -98,7 +100,7 @@ RECEIVED → IN_DIAGNOSIS → AWAITING_APPROVAL → IN_PROGRESS → COMPLETED �
 | Peça | `Part` (tipo `PART`) | Agregado (raiz) | Item vendido por unidade e instalado no veículo. Ex.: filtro de óleo, pastilha de freio. |
 | Insumo | `Part` (tipo `SUPPLY`) | Agregado (raiz) | Item consumido em quantidade, que pode ser fracionada. Ex.: óleo de motor (litros), graxa (gramas). |
 | Tipo de item | `PartType` | Enum | Distingue peça (`PART`) de insumo (`SUPPLY`). |
-| Unidade de medida | `unitOfMeasure` | Atributo | Unidade em que o item é controlado: unidade, litro, quilo etc. |
+| Unidade de medida | `UnitOfMeasure` | Enum (compartilhado) | Unidade em que o item é controlado: `UN`, `L`, `ML`, `KG`, `G` ou `M`. Só `UN` não aceita fração. Peças (`PART`) são sempre `UN`. |
 | Quantidade disponível | `availableQuantity` | Atributo | Quantidade em estoque que ainda pode ser reservada. |
 | Quantidade reservada | `reservedQuantity` | Atributo | Quantidade separada para OS com orçamento aprovado, ainda não baixada. |
 | Estoque mínimo | `minimumStock` | Atributo | Quantidade abaixo da qual a oficina deve repor o item. |
@@ -160,7 +162,8 @@ Regras:
 | Termo | Código | Definição |
 |---|---|---|
 | Dinheiro | `Money` | Valor monetário em reais (BRL). Nunca usa ponto flutuante. Permite somar e multiplicar por quantidade. |
-| Quantidade | `Quantity` | Quantidade positiva, inteira ou fracionada, conforme a unidade de medida. |
+| Quantidade | `Quantity` | Quantidade positiva com até 3 casas decimais, inteira ou fracionada conforme a unidade de medida. |
+| Unidade de medida | `UnitOfMeasure` | Unidade de controle do item de estoque, copiada para o item de peça da OS. |
 | Documento | `TaxId` | CPF ou CNPJ com dígitos verificadores válidos. |
 | Placa | `LicensePlate` | Placa nos formatos antigo ou Mercosul. |
 | Ano do modelo | `ModelYear` | Ano do veículo dentro de um intervalo válido. |
@@ -194,6 +197,7 @@ Regras:
 | Iniciar diagnóstico | `StartDiagnosis` | Mecânico | `WorkOrder` | Diagnóstico Iniciado (`DiagnosisStarted`) |
 | Incluir serviço | `AddLabor` | Mecânico | `WorkOrder` | Serviço Incluído (`LaborAdded`) |
 | Incluir peça ou insumo | `AddPart` | Mecânico | `WorkOrder` | Peça Incluída (`PartAdded`) |
+| Remover serviço ou peça | `RemoveLaborItem`, `RemovePartItem` | Mecânico | `WorkOrder` | — (o valor total é recalculado) |
 | Enviar orçamento | `SendEstimate` | Atendente | `WorkOrder` | Orçamento Enviado (`EstimateSent`) |
 | Aprovar orçamento | `ApproveEstimate` | Cliente | `WorkOrder` | Orçamento Aprovado (`EstimateApproved`) |
 | Rejeitar orçamento | `RejectEstimate` | Cliente | `WorkOrder` | Orçamento Rejeitado (`EstimateRejected`) |
@@ -212,14 +216,16 @@ Regras:
 
 ## Políticas
 
+As políticas reagem aos eventos de forma síncrona, na mesma transação do comando. Se uma delas falhar (por exemplo, estoque insuficiente na reserva), o comando inteiro é desfeito.
+
 | Política | Quando | Então |
 |---|---|---|
-| Notificar orçamento | `EstimateSent` | Enviar o orçamento ao cliente por e-mail |
+| Notificar orçamento | `EstimateSent` | Enviar ao cliente o código de acompanhamento para responder o orçamento (no MVP, registrado em log) |
 | Reservar peças | `EstimateApproved` | Reservar no estoque as peças do orçamento |
-| Liberar reserva | `EstimateRejected` | Devolver ao estoque as peças reservadas, se houver |
+| Liberar reserva | Cancelamento de OS com orçamento aprovado (futuro) | Devolver ao estoque as peças reservadas. Hoje não é acionada: a reserva só acontece na aprovação, e uma OS aprovada não volta ao diagnóstico |
 | Baixar peças | `ExecutionStarted` | Dar baixa nas peças reservadas |
-| Alertar estoque mínimo | `StockDecreased` com quantidade abaixo do mínimo | Alertar o gestor de estoque |
-| Avisar veículo pronto | `WorkOrderCompleted` | Avisar o cliente que o veículo pode ser retirado |
+| Alertar estoque mínimo | `MinimumStockReached` (disponível chega ao mínimo ao reservar) | Alertar o gestor de estoque (log e consulta `atOrBelowMinimum`) |
+| Avisar veículo pronto | `WorkOrderCompleted` | Avisar o cliente que o veículo pode ser retirado (no MVP, registrado em log) |
 | Registrar transição | Qualquer mudança de status da OS | Gravar um `StatusTransition` com data, hora e usuário |
 
 ---
@@ -244,43 +250,52 @@ Caminhos relativos a `src/main/java/br/dev/lucasaguiar/mecano/`.
 
 | Termo | Onde está | Situação |
 |---|---|---|
-| Ordem de Serviço | `workorder/domain/WorkOrder.java` · tabela `work_order` | Esqueleto |
-| Item de serviço / Item de peça | `workorder/domain/LaborItem.java`, `PartItem.java` · tabelas `labor_item`, `part_item` | Esqueleto |
-| Orçamento | `workorder/domain/Estimate.java` · tabela `estimate` | Esqueleto |
-| Transição de status | `workorder/domain/StatusTransition.java` · tabela `status_transition` | Esqueleto |
+| Ordem de Serviço | `workorder/domain/WorkOrder.java` · tabela `work_order` | Implementado |
+| Item de serviço / Item de peça | `workorder/domain/LaborItem.java`, `PartItem.java` · tabelas `labor_item`, `part_item` | Implementado |
+| Orçamento | `workorder/domain/Estimate.java` · tabela `estimate` | Implementado |
+| Transição de status | `workorder/domain/StatusTransition.java` · tabela `status_transition` | Implementado |
 | Status da OS / Situação do orçamento | `workorder/domain/WorkOrderStatus.java`, `EstimateStatus.java` | Implementado |
-| Número da OS / Código de acompanhamento | `WorkOrderNumber`, `TrackingCode` | Planejado |
-| Tempo médio de execução | `workorder/application/GetAverageExecutionTimeUseCase.java` | Esqueleto |
-| Eventos da OS | `workorder/domain/event/` | Esqueleto |
-| Casos de uso da OS | `workorder/application/*UseCase.java` | Esqueleto |
-| Peça / Insumo | `inventory/domain/Part.java`, `PartType.java` · tabela `part` | Esqueleto |
-| Movimentação de estoque | `inventory/domain/StockMovement.java`, `StockMovementType.java` · tabela `stock_movement` | Esqueleto |
-| Eventos do estoque | `inventory/domain/event/` | Esqueleto |
-| Serviço do catálogo | `catalog/domain/LaborOperation.java` · tabela `labor_operation` | Esqueleto |
-| Cliente | `customer/domain/customer/Customer.java` · tabela `customer` | Esqueleto |
-| Veículo | `customer/domain/vehicle/Vehicle.java` · tabela `vehicle` | Esqueleto |
-| Eventos de cliente e veículo | `customer/domain/customer/event/`, `customer/domain/vehicle/event/` | Esqueleto |
+| Número da OS / Código de acompanhamento | `WorkOrder.number`, `workorder/domain/TrackingCode.java` | Implementado |
+| Tempo médio de execução | `workorder/application/GetAverageExecutionTimeUseCase.java` | Implementado |
+| Eventos da OS | `workorder/domain/event/` | Implementado |
+| Casos de uso da OS | `workorder/application/*UseCase.java` | Implementado |
+| Peça / Insumo | `inventory/domain/Part.java`, `PartType.java` · tabela `part` | Implementado |
+| Movimentação de estoque | `inventory/domain/StockMovement.java`, `StockMovementType.java` · tabela `stock_movement` | Implementado |
+| Eventos do estoque | `inventory/domain/event/` | Implementado |
+| Serviço do catálogo | `catalog/domain/LaborOperation.java` · tabela `labor_operation` | Implementado |
+| Cliente | `customer/domain/customer/Customer.java` · tabela `customer` | Implementado |
+| Veículo | `customer/domain/vehicle/Vehicle.java` · tabela `vehicle` | Implementado |
+| Eventos de cliente e veículo | `customer/domain/customer/event/`, `customer/domain/vehicle/event/` | Implementado |
 | Usuário | `auth/domain/User.java` · tabela `app_user` | Implementado |
 | Login e cadastro de usuário | `auth/application/LoginUseCase.java`, `RegisterUserUseCase.java` | Implementado |
 | Token de acesso | `auth/application/AccessToken.java`, `auth/infrastructure/security/JwtTokenProvider.java` | Implementado |
-| Objetos de valor | `shared/domain/` | Esqueleto (sem validação) |
+| Objetos de valor | `shared/domain/` | Implementado |
 
+| Políticas entre contextos | `inventory/application/WorkOrderStockPolicy.java`, `MinimumStockAlertPolicy.java`, `workorder/application/CustomerNotificationPolicy.java` | Implementado |
 Legenda: **Implementado**, com regras e testes; **Esqueleto**, a classe existe, mas sem regras; **Planejado**, ainda não existe no código.
+
+Termos ainda planejados: envio real de e-mail nas notificações e cancelamento de OS.
 
 > Mantenha esta tabela atualizada a cada novo conceito. Ela é a evidência de que a documentação corresponde à implementação.
 
 ---
 
+## Decisões tomadas
+
+| Questão | Decisão |
+|---|---|
+| Para onde vai a OS após a rejeição do orçamento? | Volta para `IN_DIAGNOSIS`, para ajustar os itens e reorçar. |
+| O orçamento é recalculado a cada item ou gerado apenas no envio? | O valor total da OS é recalculado a cada item incluído ou removido. O orçamento congela esse total no envio. |
+| Quem envia o orçamento? | A equipe (atendente), por comando explícito ao fim do diagnóstico. |
+| A execução começa automaticamente na aprovação? | Não. O mecânico inicia a execução depois que o cliente aprova. |
+| Falta de estoque na aprovação | Bloqueia a aprovação, com mensagem indicando o item, o disponível e o necessário. |
+| Reserva e baixa ocorrem na mesma transação da OS? | Sim, por eventos de domínio tratados de forma síncrona: o estoque reage a `EstimateApproved` (reserva) e `ExecutionStarted` (baixa). |
+| Peça e insumo no mesmo agregado? | Sim: `Part` com `PartType`. A diferença está na unidade de medida e na aceitação de fração. |
+| Como o cliente se identifica? | Pelo código de acompanhamento (`TrackingCode`), sem login. |
+
 ## Decisões em aberto
 
-Pontos levantados no Event Storming que precisam de decisão do time. Ao decidir, registre a escolha aqui e ajuste os termos acima.
+Ao decidir, registre a escolha acima e ajuste os termos do documento.
 
-- [ ] Para onde vai a OS após a rejeição do orçamento: cancelada, volta ao diagnóstico ou é entregue sem serviço?
-- [ ] O orçamento é recalculado a cada item ou gerado apenas no envio?
-- [ ] Quem envia o orçamento: o atendente ou o sistema, ao fim do diagnóstico?
-- [ ] A execução começa automaticamente na aprovação ou depende do mecânico?
-- [ ] Existe cancelamento de OS? Se sim, qual o termo e o status?
-- [ ] Falta de estoque na aprovação: bloqueia a aprovação ou permite e sinaliza?
-- [ ] Reserva e baixa ocorrem na mesma transação da OS ou por eventos entre contextos?
-- [ ] Peça e insumo continuam no mesmo agregado (`Part` com tipo) ou viram agregados separados?
-- [ ] O cliente se identifica pelo código de acompanhamento ou pelo número da OS com o documento?
+- [ ] Existe cancelamento de OS? Se sim, qual o termo e o status? (A política "Liberar reserva" depende disso.)
+- [ ] As notificações ao cliente serão por e-mail, SMS ou ambos?
