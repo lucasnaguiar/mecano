@@ -38,8 +38,34 @@ class UserTest {
 	@Test
 	void restoreKeepsGivenIdentity() {
 		var id = UserId.newId();
-		var user = User.restore(id, "Maria", "a@b.com", "hash", Role.MECHANIC, NOW, NOW);
+		var user = User.restore(id, "Maria", "a@b.com", "hash", Role.MECHANIC, false, NOW, NOW);
 
 		assertThat(user.getId()).isEqualTo(id);
+		assertThat(user.isActive()).isFalse();
+	}
+
+	@Test
+	void registeredUserStartsActive() {
+		var user = User.register("Maria", "maria@mecano.local", "hash", Role.ADMIN, NOW);
+
+		assertThat(user.isActive()).isTrue();
+		assertThat(user.isActiveAdmin()).isTrue();
+	}
+
+	@Test
+	void changesRoleAndActivation() {
+		var user = User.register("Maria", "maria@mecano.local", "hash", Role.ADMIN, NOW);
+		var later = NOW.plusSeconds(60);
+
+		user.changeRole(Role.STOCK_MANAGER, later);
+		assertThat(user.getRole()).isEqualTo(Role.STOCK_MANAGER);
+		assertThat(user.isActiveAdmin()).isFalse();
+		assertThat(user.getUpdatedAt()).isEqualTo(later);
+
+		user.deactivate(later);
+		assertThat(user.isActive()).isFalse();
+		user.activate(later);
+		assertThat(user.isActive()).isTrue();
+		assertThatThrownBy(() -> user.changeRole(null, later)).isInstanceOf(NullPointerException.class);
 	}
 }

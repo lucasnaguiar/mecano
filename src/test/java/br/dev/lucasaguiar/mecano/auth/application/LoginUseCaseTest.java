@@ -58,6 +58,17 @@ class LoginUseCaseTest {
 	}
 
 	@Test
+	void rejectsDeactivatedUserWithTheSameMessage() {
+		var inactive = User.register("João", "joao@mecano.local", "hash", Role.MECHANIC, Instant.now());
+		inactive.deactivate(Instant.now());
+		when(userRepository.findByEmail("joao@mecano.local")).thenReturn(Optional.of(inactive));
+
+		assertThatThrownBy(() -> useCase.execute("joao@mecano.local", "senha"))
+				.isInstanceOf(InvalidCredentialsException.class);
+		verify(passwordEncoder, never()).matches(any(), any());
+	}
+
+	@Test
 	void rejectsUnknownEmail() {
 		when(userRepository.findByEmail("ninguem@mecano.local")).thenReturn(Optional.empty());
 

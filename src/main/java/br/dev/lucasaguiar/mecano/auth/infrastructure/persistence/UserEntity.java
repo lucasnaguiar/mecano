@@ -40,6 +40,9 @@ class UserEntity {
 	@Column(nullable = false, length = 32)
 	private Role role;
 
+	@Column(nullable = false)
+	private boolean active;
+
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt;
 
