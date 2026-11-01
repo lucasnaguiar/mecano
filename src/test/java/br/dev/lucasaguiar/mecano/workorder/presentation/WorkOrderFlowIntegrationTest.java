@@ -1,5 +1,6 @@
 package br.dev.lucasaguiar.mecano.workorder.presentation;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -11,6 +12,9 @@ import br.dev.lucasaguiar.mecano.TestData;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 class WorkOrderFlowIntegrationTest extends ApiIntegrationTest {
 
@@ -245,6 +249,22 @@ class WorkOrderFlowIntegrationTest extends ApiIntegrationTest {
 				.andExpect(status().isUnprocessableContent())
 				.andExpect(jsonPath("$.detail").value("Não é possível cancelar: a ordem de serviço está \"Em execução\" "
 						+ "e o cancelamento só é permitido antes do início da execução."));
+	}
+
+	@Test
+	@ExtendWith(OutputCaptureExtension.class)
+	void notificationLogMasksPersonalData(CapturedOutput output) throws Exception {
+		String id = read(perform(post("/api/admin/work-orders"), """
+				{"customerId": "%s", "vehicleId": "%s", "problemDescription": "Revisão"}
+				""".formatted(customerId, vehicleId)), "$.id");
+		var workOrder = "/api/admin/work-orders/" + id;
+		perform(post(workOrder + "/diagnosis"));
+		perform(post(workOrder + "/labor-items"), laborJson()).andExpect(status().isCreated());
+		String trackingCode = read(perform(post(workOrder + "/estimate")), "$.trackingCode");
+
+		assertThat(output).contains("Notificação para Carlos L. <c***@email.com>")
+				.contains("***" + trackingCode.substring(8))
+				.doesNotContain("carlos@email.com", "Carlos Lima", trackingCode);
 	}
 
 	private String registerPart(String prefix, String name, String type, String unit, String price, String stock)

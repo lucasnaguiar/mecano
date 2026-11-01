@@ -5,6 +5,7 @@ import br.dev.lucasaguiar.mecano.auth.application.RegisterUserUseCase;
 import br.dev.lucasaguiar.mecano.auth.domain.Role;
 import br.dev.lucasaguiar.mecano.auth.domain.User;
 import br.dev.lucasaguiar.mecano.auth.domain.UserRepository;
+import br.dev.lucasaguiar.mecano.shared.application.PersonalDataMasker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -43,6 +44,6 @@ class AdminUserInitializer implements ApplicationRunner {
 
 		var name = StringUtils.hasText(properties.name()) ? properties.name() : "Administrador";
 		registerUserUseCase.execute(new RegisterUserCommand(name, properties.email(), properties.password(), Role.ADMIN));
-		log.info("Administrador inicial criado: {}", properties.email());
+		log.info("Administrador inicial criado: {}", PersonalDataMasker.email(properties.email()));
 	}
 }

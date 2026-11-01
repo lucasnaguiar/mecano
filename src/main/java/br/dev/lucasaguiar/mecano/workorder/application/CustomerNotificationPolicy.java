@@ -1,6 +1,7 @@
 package br.dev.lucasaguiar.mecano.workorder.application;
 
 import br.dev.lucasaguiar.mecano.customer.domain.customer.CustomerRepository;
+import br.dev.lucasaguiar.mecano.shared.application.PersonalDataMasker;
 import br.dev.lucasaguiar.mecano.workorder.domain.WorkOrderId;
 import br.dev.lucasaguiar.mecano.workorder.domain.WorkOrderRepository;
 import br.dev.lucasaguiar.mecano.workorder.domain.event.EstimateSent;
@@ -11,8 +12,9 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Políticas "Notificar orçamento" e "Avisar veículo pronto". No MVP a notificação é registrada em log, com o código
- * de acompanhamento que o cliente usa para consultar e responder; o envio de e-mail entra no lugar do log.
+ * Políticas "Notificar orçamento" e "Avisar veículo pronto". No MVP a notificação é registrada em log; o envio de
+ * e-mail entra no lugar do log. Nome, e-mail e código de acompanhamento saem mascarados (LGPD): o código completo
+ * dá acesso à OS e a equipe o consulta na própria OS.
  */
 @Component
 class CustomerNotificationPolicy {
@@ -41,7 +43,9 @@ class CustomerNotificationPolicy {
 		workOrderRepository.findById(workOrderId).ifPresent(workOrder -> customerRepository
 				.findById(workOrder.getCustomerId())
 				.ifPresent(customer -> log.info("Notificação para {} <{}>: {} (código de acompanhamento {}).",
-						customer.getName(), customer.getEmail() == null ? "sem e-mail" : customer.getEmail(),
-						message.formatted(workOrder.getNumber()), workOrder.getTrackingCode().value())));
+						PersonalDataMasker.name(customer.getName()),
+						customer.getEmail() == null ? "sem e-mail" : PersonalDataMasker.email(customer.getEmail()),
+						message.formatted(workOrder.getNumber()),
+						PersonalDataMasker.lastDigits(workOrder.getTrackingCode().value(), 4))));
 	}
 }
