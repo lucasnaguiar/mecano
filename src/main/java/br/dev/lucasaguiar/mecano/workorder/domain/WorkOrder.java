@@ -20,6 +20,7 @@ import br.dev.lucasaguiar.mecano.workorder.domain.event.LaborAdded;
 import br.dev.lucasaguiar.mecano.workorder.domain.event.PartAdded;
 import br.dev.lucasaguiar.mecano.workorder.domain.event.RequiredPart;
 import br.dev.lucasaguiar.mecano.workorder.domain.event.VehicleDelivered;
+import br.dev.lucasaguiar.mecano.workorder.domain.event.WorkOrderCanceled;
 import br.dev.lucasaguiar.mecano.workorder.domain.event.WorkOrderCompleted;
 import br.dev.lucasaguiar.mecano.workorder.domain.event.WorkOrderOpened;
 import java.time.Instant;
@@ -29,14 +30,18 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
  * Aggregate root: ordem de serviço. Controla o ciclo RECEIVED → IN_DIAGNOSIS → AWAITING_APPROVAL → IN_PROGRESS →
- * COMPLETED → DELIVERED. O status só muda por comandos do negócio, e cada mudança gera um StatusTransition e um
+ * COMPLETED → DELIVERED, com cancelamento possível antes da execução (CANCELED). O status só muda por comandos do negócio, e cada mudança gera um StatusTransition e um
  * evento de domínio. Cliente, veículo, serviços e peças são referenciados apenas pelo ID.
  */
 public class WorkOrder extends AggregateRoot {
+
+	private static final Set<WorkOrderStatus> CANCELABLE = Set.of(WorkOrderStatus.RECEIVED,
+			WorkOrderStatus.IN_DIAGNOSIS, WorkOrderStatus.AWAITING_APPROVAL);
 
 	private final WorkOrderId id;
 	private final Long number;
@@ -52,13 +57,14 @@ public class WorkOrder extends AggregateRoot {
 	private final List<StatusTransition> statusTransitions;
 	private WorkOrderStatus status;
 	private String diagnosisNotes;
+	private String cancellationReason;
 	private Money totalAmount;
 	private Instant updatedAt;
 
 	private WorkOrder(WorkOrderId id, Long number, TrackingCode trackingCode, CustomerId customerId,
 			VehicleId vehicleId, WorkOrderStatus status, String problemDescription, String diagnosisNotes,
-			Long version, Instant createdAt, Instant updatedAt, List<LaborItem> laborItems, List<PartItem> partItems,
-			List<Estimate> estimates, List<StatusTransition> statusTransitions) {
+			String cancellationReason, Long version, Instant createdAt, Instant updatedAt, List<LaborItem> laborItems,
+			List<PartItem> partItems, List<Estimate> estimates, List<StatusTransition> statusTransitions) {
 		this.id = Objects.requireNonNull(id);
 		this.number = number;
 		this.trackingCode = Objects.requireNonNull(trackingCode);
@@ -67,6 +73,7 @@ public class WorkOrder extends AggregateRoot {
 		this.status = Objects.requireNonNull(status);
 		this.problemDescription = Guard.requireText(problemDescription, "A descrição do problema é obrigatória.");
 		this.diagnosisNotes = Guard.optionalText(diagnosisNotes);
+		this.cancellationReason = Guard.optionalText(cancellationReason);
 		this.version = version;
 		this.createdAt = Objects.requireNonNull(createdAt);
 		this.updatedAt = Objects.requireNonNull(updatedAt);
@@ -80,7 +87,7 @@ public class WorkOrder extends AggregateRoot {
 	public static WorkOrder open(CustomerId customerId, VehicleId vehicleId, String problemDescription,
 			UserId openedBy, Instant now) {
 		var workOrder = new WorkOrder(WorkOrderId.newId(), null, TrackingCode.generate(), customerId, vehicleId,
-				WorkOrderStatus.RECEIVED, problemDescription, null, null, now, now, List.of(), List.of(), List.of(),
+				WorkOrderStatus.RECEIVED, problemDescription, null, null, null, now, now, List.of(), List.of(), List.of(),
 				List.of());
 		workOrder.statusTransitions.add(StatusTransition.record(null, WorkOrderStatus.RECEIVED, openedBy, now));
 		workOrder.registerEvent(new WorkOrderOpened(workOrder.id, now));
@@ -89,10 +96,11 @@ public class WorkOrder extends AggregateRoot {
 
 	public static WorkOrder restore(WorkOrderId id, Long number, TrackingCode trackingCode, CustomerId customerId,
 			VehicleId vehicleId, WorkOrderStatus status, String problemDescription, String diagnosisNotes,
-			Long version, Instant createdAt, Instant updatedAt, List<LaborItem> laborItems, List<PartItem> partItems,
-			List<Estimate> estimates, List<StatusTransition> statusTransitions) {
+			String cancellationReason, Long version, Instant createdAt, Instant updatedAt, List<LaborItem> laborItems,
+			List<PartItem> partItems, List<Estimate> estimates, List<StatusTransition> statusTransitions) {
 		return new WorkOrder(id, number, trackingCode, customerId, vehicleId, status, problemDescription,
-				diagnosisNotes, version, createdAt, updatedAt, laborItems, partItems, estimates, statusTransitions);
+				diagnosisNotes, cancellationReason, version, createdAt, updatedAt, laborItems, partItems, estimates,
+				statusTransitions);
 	}
 
 	public void startDiagnosis(UserId startedBy, Instant now) {
@@ -189,6 +197,27 @@ public class WorkOrder extends AggregateRoot {
 		registerEvent(new VehicleDelivered(id, now));
 	}
 
+	/**
+	 * Cancelamento pela equipe, permitido só antes do início da execução (depois disso as peças já foram baixadas).
+	 * Um orçamento pendente é encerrado sem resposta; se já estava aprovado, o evento leva as peças reservadas para
+	 * a reserva ser liberada.
+	 */
+	public void cancel(String reason, UserId canceledBy, Instant now) {
+		var cancellationReason = Guard.requireText(reason, "O motivo do cancelamento é obrigatório.");
+		if (!CANCELABLE.contains(status)) {
+			throw new BusinessRuleException(("Não é possível cancelar: a ordem de serviço está \"%s\" e o cancelamento "
+					+ "só é permitido antes do início da execução.").formatted(status.label()));
+		}
+		var estimate = currentEstimate();
+		var partsReserved = status == WorkOrderStatus.AWAITING_APPROVAL
+				&& estimate.filter(Estimate::isApproved).isPresent();
+		var reservedParts = partsReserved ? requiredParts() : List.<RequiredPart>of();
+		estimate.filter(Estimate::isPending).ifPresent(pending -> pending.cancel(now));
+		this.cancellationReason = cancellationReason;
+		changeStatus(WorkOrderStatus.CANCELED, canceledBy, now);
+		registerEvent(new WorkOrderCanceled(id, reservedParts, now));
+	}
+
 	public Optional<Estimate> currentEstimate() {
 		return estimates.isEmpty() ? Optional.empty() : Optional.of(estimates.getLast());
 	}
@@ -262,6 +291,10 @@ public class WorkOrder extends AggregateRoot {
 
 	public String getDiagnosisNotes() {
 		return diagnosisNotes;
+	}
+
+	public String getCancellationReason() {
+		return cancellationReason;
 	}
 
 	public Money getTotalAmount() {

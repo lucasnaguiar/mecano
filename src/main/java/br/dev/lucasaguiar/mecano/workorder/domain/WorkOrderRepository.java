@@ -33,7 +33,7 @@ public interface WorkOrderRepository {
 	 */
 	Page<WorkOrder> findOngoing(PageQuery query);
 
-	/** Indica se o veículo já tem uma OS ainda não entregue. */
+	/** Indica se o veículo já tem uma OS em aberto (nem entregue nem cancelada). */
 	boolean hasOpenWorkOrder(VehicleId vehicleId);
 
 	/** Tempo médio entre o início da execução e a finalização das OS finalizadas. */

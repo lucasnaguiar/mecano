@@ -9,7 +9,8 @@ public enum WorkOrderStatus {
 	AWAITING_APPROVAL("Aguardando aprovação"),
 	IN_PROGRESS("Em execução"),
 	COMPLETED("Finalizada"),
-	DELIVERED("Entregue");
+	DELIVERED("Entregue"),
+	CANCELED("Cancelada");
 
 	private final String label;
 

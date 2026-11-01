@@ -23,6 +23,7 @@ import br.dev.lucasaguiar.mecano.workorder.domain.event.LaborAdded;
 import br.dev.lucasaguiar.mecano.workorder.domain.event.PartAdded;
 import br.dev.lucasaguiar.mecano.workorder.domain.event.RequiredPart;
 import br.dev.lucasaguiar.mecano.workorder.domain.event.VehicleDelivered;
+import br.dev.lucasaguiar.mecano.workorder.domain.event.WorkOrderCanceled;
 import br.dev.lucasaguiar.mecano.workorder.domain.event.WorkOrderCompleted;
 import br.dev.lucasaguiar.mecano.workorder.domain.event.WorkOrderOpened;
 import java.time.Instant;
@@ -245,7 +246,7 @@ class WorkOrderTest {
 		var transition = StatusTransition.restore(UUID.randomUUID(), null, WorkOrderStatus.RECEIVED, null, NOW);
 
 		var restored = WorkOrder.restore(id, 1000L, new TrackingCode("ABCDEFGHJKLM"), CustomerId.newId(),
-				VehicleId.newId(), WorkOrderStatus.AWAITING_APPROVAL, "Problema", "Notas", 3L, NOW, NOW,
+				VehicleId.newId(), WorkOrderStatus.AWAITING_APPROVAL, "Problema", "Notas", null, 3L, NOW, NOW,
 				List.of(labor), List.of(part), List.of(estimate), List.of(transition));
 
 		assertThat(restored.getId()).isEqualTo(id);
@@ -266,8 +267,96 @@ class WorkOrderTest {
 	}
 
 	@Test
+	void cancelBeforeDiagnosisRecordsReasonAndHistory() {
+		workOrder.pullEvents();
+
+		workOrder.cancel("  Cliente desistiu  ", ATTENDANT, NOW);
+
+		assertThat(workOrder.getStatus()).isEqualTo(WorkOrderStatus.CANCELED);
+		assertThat(workOrder.getCancellationReason()).isEqualTo("Cliente desistiu");
+		assertThat(workOrder.getStatusTransitions().getLast()).satisfies(transition -> {
+			assertThat(transition.getFromStatus()).isEqualTo(WorkOrderStatus.RECEIVED);
+			assertThat(transition.getToStatus()).isEqualTo(WorkOrderStatus.CANCELED);
+			assertThat(transition.getChangedBy()).isEqualTo(ATTENDANT);
+		});
+		assertThat(workOrder.pullEvents()).singleElement().isInstanceOfSatisfying(WorkOrderCanceled.class,
+				event -> assertThat(event.reservedParts()).isEmpty());
+	}
+
+	@Test
+	void cancelWithPendingEstimateClosesItWithoutReleasingStock() {
+		awaitingApprovalWithParts();
+		workOrder.pullEvents();
+
+		workOrder.cancel("Cliente não respondeu", ATTENDANT, NOW);
+
+		assertThat(workOrder.currentEstimate()).get().satisfies(estimate -> {
+			assertThat(estimate.getStatus()).isEqualTo(EstimateStatus.CANCELED);
+			assertThat(estimate.getRespondedAt()).isEqualTo(NOW);
+		});
+		assertThat(workOrder.pullEvents()).singleElement().isInstanceOfSatisfying(WorkOrderCanceled.class,
+				event -> assertThat(event.reservedParts()).isEmpty());
+		assertThatThrownBy(() -> workOrder.approveEstimate(NOW)).isInstanceOf(BusinessRuleException.class)
+				.hasMessage("Não há orçamento aguardando resposta nesta ordem de serviço.");
+	}
+
+	@Test
+	void cancelAfterApprovalReleasesReservedParts() {
+		awaitingApprovalWithParts();
+		workOrder.approveEstimate(NOW);
+		workOrder.pullEvents();
+
+		workOrder.cancel("Cliente levou o veículo", ATTENDANT, NOW);
+
+		assertThat(workOrder.currentEstimate()).get().extracting(Estimate::getStatus)
+				.isEqualTo(EstimateStatus.APPROVED);
+		assertThat(workOrder.pullEvents()).singleElement().isInstanceOfSatisfying(WorkOrderCanceled.class,
+				event -> assertThat(event.reservedParts()).containsExactly(
+						new RequiredPart(FILTER, Quantity.of(3)), new RequiredPart(OIL, Quantity.of("4"))));
+	}
+
+	@Test
+	void cancelAfterRejectionHasNothingToRelease() {
+		awaitingApprovalWithParts();
+		workOrder.rejectEstimate(NOW);
+		workOrder.pullEvents();
+
+		workOrder.cancel("Cliente não quis reorçar", ATTENDANT, NOW);
+
+		assertThat(workOrder.currentEstimate()).get().extracting(Estimate::getStatus)
+				.isEqualTo(EstimateStatus.REJECTED);
+		assertThat(workOrder.pullEvents()).singleElement().isInstanceOfSatisfying(WorkOrderCanceled.class,
+				event -> assertThat(event.reservedParts()).isEmpty());
+	}
+
+	@Test
+	void cancelRequiresReasonAndIsRefusedOnceExecutionStarted() {
+		assertThatThrownBy(() -> workOrder.cancel(" ", ATTENDANT, NOW)).isInstanceOf(InvalidValueException.class)
+				.hasMessage("O motivo do cancelamento é obrigatório.");
+
+		awaitingApprovalWithParts();
+		workOrder.approveEstimate(NOW);
+		workOrder.startExecution(MECHANIC, NOW);
+
+		assertThatThrownBy(() -> workOrder.cancel("Desistência", ATTENDANT, NOW))
+				.isInstanceOf(BusinessRuleException.class)
+				.hasMessage("Não é possível cancelar: a ordem de serviço está \"Em execução\" e o cancelamento só é "
+						+ "permitido antes do início da execução.");
+	}
+
+	@Test
+	void canceledWorkOrderIsFinal() {
+		workOrder.cancel("Duplicada", ATTENDANT, NOW);
+
+		assertThatThrownBy(() -> workOrder.startDiagnosis(MECHANIC, NOW)).isInstanceOf(BusinessRuleException.class);
+		assertThatThrownBy(() -> workOrder.cancel("De novo", ATTENDANT, NOW))
+				.isInstanceOf(BusinessRuleException.class);
+	}
+
+	@Test
 	void statusesHavePortugueseLabels() {
 		assertThat(WorkOrderStatus.AWAITING_APPROVAL.label()).isEqualTo("Aguardando aprovação");
+		assertThat(WorkOrderStatus.CANCELED.label()).isEqualTo("Cancelada");
 	}
 
 	private LaborItem addOilChange() {

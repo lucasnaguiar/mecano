@@ -147,7 +147,7 @@ class WorkOrderPersistenceTest {
 
 	private WorkOrderEntity workOrder(WorkOrderStatus status, Instant createdAt) {
 		return new WorkOrderEntity(UUID.randomUUID(), null, UUID.randomUUID().toString().replace("-", ""),
-				customerId, vehicleId, status, "Barulho no motor", null, BigDecimal.ZERO, null, createdAt, createdAt,
+				customerId, vehicleId, status, "Barulho no motor", null, null, BigDecimal.ZERO, null, createdAt, createdAt,
 				new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
 	}
 

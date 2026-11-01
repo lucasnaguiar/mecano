@@ -38,7 +38,7 @@ A tradução de cada termo do negócio para o código está definida neste docum
 Relações entre contextos:
 
 - `workorder` **consulta** `customer`, `catalog` e `inventory` para montar a OS, guardando apenas IDs e cópias de preço.
-- `inventory` **reage** aos eventos `EstimateApproved`, `ExecutionStarted` e `EstimateRejected`, publicados por `workorder`.
+- `inventory` **reage** aos eventos `EstimateApproved`, `ExecutionStarted` e `WorkOrderCanceled`, publicados por `workorder`.
 - Nenhum contexto de negócio depende de `auth`. Quando precisa saber quem executou uma ação, guarda apenas o ID do usuário (`UserId`, que fica em `shared` justamente para isso).
 
 ---
@@ -56,6 +56,8 @@ Relações entre contextos:
 | Item de peça | `PartItem` | Entidade (interna) | Peça ou insumo incluído na OS, com quantidade, preço e descrição copiados no momento da inclusão. |
 | Orçamento | `Estimate` | Entidade (interna) | Proposta de valor enviada ao cliente, calculada pela soma dos itens da OS. Pode ser aprovado ou rejeitado. |
 | Valor total | `totalAmount` | Objeto de valor (`Money`) | Soma dos subtotais de todos os itens da OS. É recalculado sempre que um item é incluído ou removido. |
+| Cancelamento | `cancel` | Operação | Encerramento da OS pela equipe antes do início da execução, com motivo obrigatório. |
+| Motivo do cancelamento | `cancellationReason` | Atributo | Justificativa registrada pela equipe ao cancelar a OS. |
 | Transição de status | `StatusTransition` | Entidade (interna) | Registro de cada mudança de status da OS, com status anterior, novo status, data, hora e usuário. Base para o tempo médio de execução. |
 | Tempo médio de execução | `GetAverageExecutionTimeUseCase` | Modelo de leitura | Média do tempo entre `IN_PROGRESS` e `COMPLETED` das OS finalizadas. |
 
@@ -69,19 +71,22 @@ Relações entre contextos:
 | Em execução | `IN_PROGRESS` | Os serviços aprovados estão sendo realizados | A execução é iniciada (`StartExecution`) |
 | Finalizada | `COMPLETED` | Os serviços foram concluídos e o veículo está pronto | A OS é finalizada (`CompleteWorkOrder`) |
 | Entregue | `DELIVERED` | O veículo foi devolvido ao cliente | O veículo é entregue (`DeliverVehicle`) |
+| Cancelada | `CANCELED` | O atendimento foi encerrado sem execução | A equipe cancela a OS (`CancelWorkOrder`) |
 
 Regras de transição:
 
 ```
 RECEIVED → IN_DIAGNOSIS → AWAITING_APPROVAL → IN_PROGRESS → COMPLETED → DELIVERED
+RECEIVED | IN_DIAGNOSIS | AWAITING_APPROVAL → CANCELED
 ```
 
 - O status nunca é alterado diretamente. Ele muda apenas como consequência de um comando do negócio.
 - Serviços e peças só podem ser incluídos em `IN_DIAGNOSIS`.
-- Uma OS em `DELIVERED` não pode voltar a nenhum status anterior.
+- Uma OS em `DELIVERED` ou `CANCELED` não pode voltar a nenhum status anterior.
+- O cancelamento só é feito pela equipe, com motivo obrigatório, e apenas em `RECEIVED`, `IN_DIAGNOSIS` ou `AWAITING_APPROVAL`. A partir de `IN_PROGRESS` as peças já foram baixadas e a OS segue até a finalização.
 - A aprovação do orçamento não muda o status: a OS continua em `AWAITING_APPROVAL`, com o orçamento `APPROVED`, até o mecânico iniciar a execução.
 - A rejeição do orçamento devolve a OS para `IN_DIAGNOSIS`, onde os itens podem ser ajustados e um novo orçamento enviado.
-- Um veículo não pode ter mais de uma OS aberta (não entregue) ao mesmo tempo.
+- Um veículo não pode ter mais de uma OS aberta (nem entregue nem cancelada) ao mesmo tempo.
 
 ### Situação do orçamento
 
@@ -90,6 +95,7 @@ RECEIVED → IN_DIAGNOSIS → AWAITING_APPROVAL → IN_PROGRESS → COMPLETED �
 | Pendente | `PENDING` | Enviado ao cliente, sem resposta |
 | Aprovado | `APPROVED` | O cliente autorizou a execução |
 | Rejeitado | `REJECTED` | O cliente recusou o orçamento |
+| Cancelado | `CANCELED` | Encerrado sem resposta porque a equipe cancelou a OS |
 
 ---
 
@@ -204,6 +210,7 @@ Regras:
 | Iniciar execução | `StartExecution` | Mecânico | `WorkOrder` | Execução Iniciada (`ExecutionStarted`) |
 | Finalizar ordem de serviço | `CompleteWorkOrder` | Mecânico | `WorkOrder` | OS Finalizada (`WorkOrderCompleted`) |
 | Entregar veículo | `DeliverVehicle` | Atendente | `WorkOrder` | Veículo Entregue (`VehicleDelivered`) |
+| Cancelar ordem de serviço | `CancelWorkOrder` | Atendente | `WorkOrder` | OS Cancelada (`WorkOrderCanceled`) |
 | Cadastrar peça ou insumo | `RegisterPart` | Gestor de estoque | `Part` | Peça Cadastrada (`PartRegistered`) |
 | Registrar entrada | `RegisterStockEntry` | Gestor de estoque | `Part` | Entrada Registrada (`StockEntryRegistered`) |
 | Alterar preço | `ChangePartPrice` | Gestor de estoque | `Part` | Preço Alterado (`PartPriceChanged`) |
@@ -222,7 +229,7 @@ As políticas reagem aos eventos de forma síncrona, na mesma transação do com
 |---|---|---|
 | Notificar orçamento | `EstimateSent` | Enviar ao cliente o código de acompanhamento para responder o orçamento (no MVP, registrado em log) |
 | Reservar peças | `EstimateApproved` | Reservar no estoque as peças do orçamento |
-| Liberar reserva | Cancelamento de OS com orçamento aprovado (futuro) | Devolver ao estoque as peças reservadas. Hoje não é acionada: a reserva só acontece na aprovação, e uma OS aprovada não volta ao diagnóstico |
+| Liberar reserva | `WorkOrderCanceled` com orçamento já aprovado | Devolver à quantidade disponível as peças reservadas (movimentação `RELEASE`) |
 | Baixar peças | `ExecutionStarted` | Dar baixa nas peças reservadas |
 | Alertar estoque mínimo | `MinimumStockReached` (disponível chega ao mínimo ao reservar) | Alertar o gestor de estoque (log e consulta `atOrBelowMinimum`) |
 | Avisar veículo pronto | `WorkOrderCompleted` | Avisar o cliente que o veículo pode ser retirado (no MVP, registrado em log) |
@@ -239,7 +246,7 @@ As políticas reagem aos eventos de forma síncrona, na mesma transação do com
 | `setStatus`, "mudar status" | O comando do negócio (`approveEstimate`, `complete`...) | O status é consequência de uma ação, nunca alterado diretamente. |
 | "Cliente" para quem faz login | **Usuário** (`User`) | Cliente é quem traz o veículo. Usuário é a equipe da oficina. |
 | "Peça" para tudo do estoque | **Peça** ou **insumo**, conforme o tipo | Insumos têm quantidade fracionada e unidade de medida própria. |
-| "Cancelar orçamento" | **Rejeitar orçamento** | Rejeição é uma decisão do cliente. Cancelamento de OS ainda não foi definido. |
+| "Cancelar orçamento" | **Rejeitar orçamento** (cliente) ou **cancelar a OS** (equipe) | Rejeição é uma decisão do cliente e devolve a OS ao diagnóstico. Cancelamento encerra a OS e é feito só pela equipe. |
 | "Fechar OS" | **Finalizar** (`COMPLETED`) ou **entregar** (`DELIVERED`) | São dois momentos diferentes do atendimento. |
 
 ---
@@ -274,7 +281,7 @@ Caminhos relativos a `src/main/java/br/dev/lucasaguiar/mecano/`.
 | Políticas entre contextos | `inventory/application/WorkOrderStockPolicy.java`, `MinimumStockAlertPolicy.java`, `workorder/application/CustomerNotificationPolicy.java` | Implementado |
 Legenda: **Implementado**, com regras e testes; **Esqueleto**, a classe existe, mas sem regras; **Planejado**, ainda não existe no código.
 
-Termos ainda planejados: envio real de e-mail nas notificações e cancelamento de OS.
+Termos ainda planejados: envio real de e-mail nas notificações.
 
 > Mantenha esta tabela atualizada a cada novo conceito. Ela é a evidência de que a documentação corresponde à implementação.
 
@@ -292,10 +299,10 @@ Termos ainda planejados: envio real de e-mail nas notificações e cancelamento 
 | Reserva e baixa ocorrem na mesma transação da OS? | Sim, por eventos de domínio tratados de forma síncrona: o estoque reage a `EstimateApproved` (reserva) e `ExecutionStarted` (baixa). |
 | Peça e insumo no mesmo agregado? | Sim: `Part` com `PartType`. A diferença está na unidade de medida e na aceitação de fração. |
 | Como o cliente se identifica? | Pelo código de acompanhamento (`TrackingCode`), sem login. |
+| Existe cancelamento de OS? | Sim, só pela equipe e antes da execução: status `CANCELED` (Cancelada), motivo obrigatório, orçamento pendente encerrado como `CANCELED` e reserva liberada se o orçamento estava aprovado. A OS cancelada não conta como aberta nem entra no tempo médio de execução. |
 
 ## Decisões em aberto
 
 Ao decidir, registre a escolha acima e ajuste os termos do documento.
 
-- [ ] Existe cancelamento de OS? Se sim, qual o termo e o status? (A política "Liberar reserva" depende disso.)
 - [ ] As notificações ao cliente serão por e-mail, SMS ou ambos?

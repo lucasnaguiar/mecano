@@ -7,7 +7,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Orçamento enviado ao cliente, com o total congelado no envio. Pode ser aprovado ou rejeitado uma única vez.
+ * Orçamento enviado ao cliente, com o total congelado no envio. Pode ser aprovado ou rejeitado uma única vez,
+ * ou encerrado sem resposta se a OS for cancelada.
  */
 public class Estimate {
 
@@ -40,6 +41,10 @@ public class Estimate {
 
 	void reject(Instant now) {
 		respond(EstimateStatus.REJECTED, now);
+	}
+
+	void cancel(Instant now) {
+		respond(EstimateStatus.CANCELED, now);
 	}
 
 	private void respond(EstimateStatus response, Instant now) {

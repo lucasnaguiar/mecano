@@ -6,5 +6,7 @@ package br.dev.lucasaguiar.mecano.workorder.domain;
 public enum EstimateStatus {
 	PENDING,
 	APPROVED,
-	REJECTED
+	REJECTED,
+	/** Encerrado sem resposta do cliente porque a OS foi cancelada pela equipe. */
+	CANCELED
 }

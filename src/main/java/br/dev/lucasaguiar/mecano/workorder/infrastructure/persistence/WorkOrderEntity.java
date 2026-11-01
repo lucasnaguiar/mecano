@@ -61,6 +61,9 @@ class WorkOrderEntity {
 	@Column(name = "diagnosis_notes")
 	private String diagnosisNotes;
 
+	@Column(name = "cancellation_reason")
+	private String cancellationReason;
+
 	@Column(name = "total_amount", nullable = false, precision = 12, scale = 2)
 	private BigDecimal totalAmount;
 

@@ -13,7 +13,7 @@ import java.util.UUID;
 @Schema(description = "Ordem de serviço (visão da equipe)")
 public record WorkOrderResponse(UUID id, Long number, String trackingCode, UUID customerId, UUID vehicleId,
 		WorkOrderStatus status, String statusLabel, String problemDescription, String diagnosisNotes,
-		BigDecimal totalAmount, List<LaborItemResponse> laborItems, List<PartItemResponse> partItems,
+		String cancellationReason, BigDecimal totalAmount, List<LaborItemResponse> laborItems, List<PartItemResponse> partItems,
 		List<EstimateResponse> estimates, List<StatusTransitionResponse> statusHistory, Instant createdAt,
 		Instant updatedAt) {
 
@@ -21,7 +21,8 @@ public record WorkOrderResponse(UUID id, Long number, String trackingCode, UUID 
 		return new WorkOrderResponse(workOrder.getId().value(), workOrder.getNumber(),
 				workOrder.getTrackingCode().value(), workOrder.getCustomerId().value(),
 				workOrder.getVehicleId().value(), workOrder.getStatus(), workOrder.getStatus().label(),
-				workOrder.getProblemDescription(), workOrder.getDiagnosisNotes(), workOrder.getTotalAmount().amount(),
+				workOrder.getProblemDescription(), workOrder.getDiagnosisNotes(), workOrder.getCancellationReason(),
+				workOrder.getTotalAmount().amount(),
 				workOrder.getLaborItems().stream().map(item -> new LaborItemResponse(item.getId(),
 						item.getLaborOperationId().value(), item.getDescription(), item.getQuantity(),
 						item.getUnitPrice().amount(), item.subtotal().amount())).toList(),

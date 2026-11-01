@@ -1,6 +1,7 @@
 package br.dev.lucasaguiar.mecano.workorder.infrastructure.persistence;
 
 import br.dev.lucasaguiar.mecano.workorder.domain.WorkOrderStatus;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -36,7 +37,7 @@ interface SpringDataWorkOrderRepository extends JpaRepository<WorkOrderEntity, U
 			""")
 	Page<WorkOrderEntity> findOngoing(Pageable pageable);
 
-	boolean existsByVehicleIdAndStatusNot(UUID vehicleId, WorkOrderStatus status);
+	boolean existsByVehicleIdAndStatusNotIn(UUID vehicleId, Collection<WorkOrderStatus> statuses);
 
 	/**
 	 * Tempo médio, em segundos, entre a entrada em IN_PROGRESS e a entrada em COMPLETED das OS finalizadas.

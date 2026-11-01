@@ -86,7 +86,8 @@ public class JpaWorkOrderRepository implements WorkOrderRepository {
 
 	@Override
 	public boolean hasOpenWorkOrder(VehicleId vehicleId) {
-		return springDataRepository.existsByVehicleIdAndStatusNot(vehicleId.value(), WorkOrderStatus.DELIVERED);
+		return springDataRepository.existsByVehicleIdAndStatusNotIn(vehicleId.value(),
+				List.of(WorkOrderStatus.DELIVERED, WorkOrderStatus.CANCELED));
 	}
 
 	@Override
@@ -99,8 +100,8 @@ public class JpaWorkOrderRepository implements WorkOrderRepository {
 		return new WorkOrderEntity(workOrder.getId().value(), workOrder.getNumber(),
 				workOrder.getTrackingCode().value(), workOrder.getCustomerId().value(),
 				workOrder.getVehicleId().value(), workOrder.getStatus(), workOrder.getProblemDescription(),
-				workOrder.getDiagnosisNotes(), workOrder.getTotalAmount().amount(), workOrder.getVersion(),
-				workOrder.getCreatedAt(), workOrder.getUpdatedAt(),
+				workOrder.getDiagnosisNotes(), workOrder.getCancellationReason(), workOrder.getTotalAmount().amount(),
+				workOrder.getVersion(), workOrder.getCreatedAt(), workOrder.getUpdatedAt(),
 				map(workOrder.getLaborItems(), item -> new LaborItemEntity(item.getId(),
 						item.getLaborOperationId().value(), item.getDescription(), item.getUnitPrice().amount(),
 						item.getQuantity())),
@@ -119,7 +120,7 @@ public class JpaWorkOrderRepository implements WorkOrderRepository {
 		return WorkOrder.restore(new WorkOrderId(entity.getId()), entity.getNumber(),
 				new TrackingCode(entity.getTrackingCode()), new CustomerId(entity.getCustomerId()),
 				new VehicleId(entity.getVehicleId()), entity.getStatus(), entity.getProblemDescription(),
-				entity.getDiagnosisNotes(), entity.getVersion(), entity.getCreatedAt(), entity.getUpdatedAt(),
+				entity.getDiagnosisNotes(), entity.getCancellationReason(), entity.getVersion(), entity.getCreatedAt(), entity.getUpdatedAt(),
 				map(entity.getLaborItems(), item -> LaborItem.restore(item.getId(),
 						new LaborOperationId(item.getLaborOperationId()), item.getDescription(),
 						new Money(item.getUnitPrice()), item.getQuantity())),
