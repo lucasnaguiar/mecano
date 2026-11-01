@@ -53,6 +53,17 @@ logging:
     br.dev.lucasaguiar.mecano: DEBUG
 
 ---
+# Dados de demonstração (DemoDataInitializer). Ative junto com outro perfil: SPRING_PROFILES_ACTIVE=local,demo.
+spring:
+  config:
+    activate:
+      on-profile: demo
+
+app:
+  demo:
+    password: ${DEMO_PASSWORD:demo-mecano}
+
+---
 # Datasource fornecido pelo Testcontainers (@ServiceConnection).
 spring:
   config:
