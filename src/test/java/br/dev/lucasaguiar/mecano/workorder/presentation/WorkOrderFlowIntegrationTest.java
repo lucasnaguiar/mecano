@@ -189,6 +189,64 @@ class WorkOrderFlowIntegrationTest extends ApiIntegrationTest {
 				.andExpect(jsonPath("$.detail").value("Veículo não encontrado."));
 	}
 
+	@Test
+	void cancelsApprovedWorkOrderAndReleasesReservedParts() throws Exception {
+		String id = read(perform(post("/api/admin/work-orders"), """
+				{"customerId": "%s", "vehicleId": "%s", "problemDescription": "Troca de filtro"}
+				""".formatted(customerId, vehicleId)), "$.id");
+		var workOrder = "/api/admin/work-orders/" + id;
+		perform(post(workOrder + "/diagnosis"));
+		perform(post(workOrder + "/part-items"), partJson(filterId, "2")).andExpect(status().isCreated());
+		String trackingCode = read(perform(post(workOrder + "/estimate")), "$.trackingCode");
+		mockMvc.perform(post("/api/customer/work-orders/" + trackingCode + "/approval")).andExpect(status().isOk());
+		perform(get("/api/admin/parts/" + filterId)).andExpect(jsonPath("$.reservedQuantity").value(2));
+
+		perform(post(workOrder + "/cancellation"), "{\"reason\": \"\"}")
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errors.reason").value("O motivo do cancelamento é obrigatório."));
+		perform(post(workOrder + "/cancellation"), "{\"reason\": \"Cliente desistiu\"}")
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("CANCELED"))
+				.andExpect(jsonPath("$.statusLabel").value("Cancelada"))
+				.andExpect(jsonPath("$.cancellationReason").value("Cliente desistiu"))
+				.andExpect(jsonPath("$.statusHistory[-1].toStatus").value("CANCELED"));
+
+		perform(get("/api/admin/parts/" + filterId))
+				.andExpect(jsonPath("$.availableQuantity").value(5))
+				.andExpect(jsonPath("$.reservedQuantity").value(0));
+		perform(get("/api/admin/parts/" + filterId + "/movements"))
+				.andExpect(jsonPath("$[*].type", Matchers.hasItem("RELEASE")));
+		mockMvc.perform(get("/api/customer/work-orders/" + trackingCode))
+				.andExpect(jsonPath("$.statusLabel").value("Cancelada"));
+		mockMvc.perform(post("/api/customer/work-orders/" + trackingCode + "/approval"))
+				.andExpect(status().isUnprocessableContent());
+		perform(get("/api/admin/work-orders/ongoing").param("size", "100"))
+				.andExpect(jsonPath("$.content[*].id", Matchers.not(Matchers.hasItem(id))));
+
+		perform(post("/api/admin/work-orders"), """
+				{"customerId": "%s", "vehicleId": "%s", "problemDescription": "Nova visita"}
+				""".formatted(customerId, vehicleId))
+				.andExpect(status().isCreated());
+	}
+
+	@Test
+	void cancellationIsRefusedOnceExecutionStarted() throws Exception {
+		String id = read(perform(post("/api/admin/work-orders"), """
+				{"customerId": "%s", "vehicleId": "%s", "problemDescription": "Revisão"}
+				""".formatted(customerId, vehicleId)), "$.id");
+		var workOrder = "/api/admin/work-orders/" + id;
+		perform(post(workOrder + "/diagnosis"));
+		perform(post(workOrder + "/labor-items"), laborJson()).andExpect(status().isCreated());
+		String trackingCode = read(perform(post(workOrder + "/estimate")), "$.trackingCode");
+		mockMvc.perform(post("/api/customer/work-orders/" + trackingCode + "/approval")).andExpect(status().isOk());
+		perform(post(workOrder + "/execution")).andExpect(status().isOk());
+
+		perform(post(workOrder + "/cancellation"), "{\"reason\": \"Desistência\"}")
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(jsonPath("$.detail").value("Não é possível cancelar: a ordem de serviço está \"Em execução\" "
+						+ "e o cancelamento só é permitido antes do início da execução."));
+	}
+
 	private String registerPart(String prefix, String name, String type, String unit, String price, String stock)
 			throws Exception {
 		String id = read(perform(post("/api/admin/parts"), """

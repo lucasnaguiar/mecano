@@ -9,6 +9,7 @@ import br.dev.lucasaguiar.mecano.shared.presentation.PageParams;
 import br.dev.lucasaguiar.mecano.shared.presentation.PageResponse;
 import br.dev.lucasaguiar.mecano.workorder.application.AddLaborUseCase;
 import br.dev.lucasaguiar.mecano.workorder.application.AddPartUseCase;
+import br.dev.lucasaguiar.mecano.workorder.application.CancelWorkOrderUseCase;
 import br.dev.lucasaguiar.mecano.workorder.application.CompleteWorkOrderUseCase;
 import br.dev.lucasaguiar.mecano.workorder.application.DeliverVehicleUseCase;
 import br.dev.lucasaguiar.mecano.workorder.application.GetWorkOrderUseCase;
@@ -24,6 +25,7 @@ import br.dev.lucasaguiar.mecano.workorder.domain.WorkOrderId;
 import br.dev.lucasaguiar.mecano.workorder.domain.WorkOrderStatus;
 import br.dev.lucasaguiar.mecano.workorder.presentation.dto.AddLaborRequest;
 import br.dev.lucasaguiar.mecano.workorder.presentation.dto.AddPartRequest;
+import br.dev.lucasaguiar.mecano.workorder.presentation.dto.CancelWorkOrderRequest;
 import br.dev.lucasaguiar.mecano.workorder.presentation.dto.OpenWorkOrderRequest;
 import br.dev.lucasaguiar.mecano.workorder.presentation.dto.SendEstimateRequest;
 import br.dev.lucasaguiar.mecano.workorder.presentation.dto.WorkOrderResponse;
@@ -64,6 +66,7 @@ public class WorkOrderAdminController {
 	private final GetWorkOrderUseCase getWorkOrderUseCase;
 	private final ListWorkOrdersUseCase listWorkOrdersUseCase;
 	private final ListOngoingWorkOrdersUseCase listOngoingWorkOrdersUseCase;
+	private final CancelWorkOrderUseCase cancelWorkOrderUseCase;
 
 	public WorkOrderAdminController(OpenWorkOrderUseCase openWorkOrderUseCase,
 			StartDiagnosisUseCase startDiagnosisUseCase, AddLaborUseCase addLaborUseCase,
@@ -71,7 +74,8 @@ public class WorkOrderAdminController {
 			RemovePartItemUseCase removePartItemUseCase, SendEstimateUseCase sendEstimateUseCase,
 			StartExecutionUseCase startExecutionUseCase, CompleteWorkOrderUseCase completeWorkOrderUseCase,
 			DeliverVehicleUseCase deliverVehicleUseCase, GetWorkOrderUseCase getWorkOrderUseCase,
-			ListWorkOrdersUseCase listWorkOrdersUseCase, ListOngoingWorkOrdersUseCase listOngoingWorkOrdersUseCase) {
+			ListWorkOrdersUseCase listWorkOrdersUseCase, ListOngoingWorkOrdersUseCase listOngoingWorkOrdersUseCase,
+			CancelWorkOrderUseCase cancelWorkOrderUseCase) {
 		this.openWorkOrderUseCase = openWorkOrderUseCase;
 		this.startDiagnosisUseCase = startDiagnosisUseCase;
 		this.addLaborUseCase = addLaborUseCase;
@@ -85,6 +89,7 @@ public class WorkOrderAdminController {
 		this.getWorkOrderUseCase = getWorkOrderUseCase;
 		this.listWorkOrdersUseCase = listWorkOrdersUseCase;
 		this.listOngoingWorkOrdersUseCase = listOngoingWorkOrdersUseCase;
+		this.cancelWorkOrderUseCase = cancelWorkOrderUseCase;
 	}
 
 	@PostMapping
@@ -176,5 +181,15 @@ public class WorkOrderAdminController {
 	@Operation(summary = "Registra a entrega do veículo ao cliente")
 	public WorkOrderResponse deliver(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
 		return WorkOrderResponse.from(deliverVehicleUseCase.execute(new WorkOrderId(id), AuthenticatedUser.idOf(jwt)));
+	}
+
+	@PostMapping("/{id}/cancellation")
+	@Operation(summary = "Cancela a ordem de serviço antes do início da execução",
+			description = "Permitido em Recebida, Em diagnóstico e Aguardando aprovação. Um orçamento pendente é "
+					+ "encerrado sem resposta e, se o orçamento já estava aprovado, as peças reservadas voltam ao estoque.")
+	public WorkOrderResponse cancel(@PathVariable UUID id, @RequestBody @Valid CancelWorkOrderRequest request,
+			@AuthenticationPrincipal Jwt jwt) {
+		return WorkOrderResponse.from(cancelWorkOrderUseCase.execute(new WorkOrderId(id), request.reason(),
+				AuthenticatedUser.idOf(jwt)));
 	}
 }
