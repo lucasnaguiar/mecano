@@ -33,7 +33,8 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
 	@Bean
-	SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+	SecurityFilterChain securityFilterChain(HttpSecurity http, ProblemDetailSecurityHandler problemHandler)
+			throws Exception {
 		return http
 				.csrf(AbstractHttpConfigurer::disable)
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -50,8 +51,13 @@ public class SecurityConfig {
 						.requestMatchers("/api/admin/**").authenticated()
 						.requestMatchers("/error").permitAll()
 						.anyRequest().denyAll())
+				.exceptionHandling(exceptions -> exceptions
+						.authenticationEntryPoint(problemHandler)
+						.accessDeniedHandler(problemHandler))
 				.oauth2ResourceServer(oauth2 -> oauth2
-						.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
+						.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
+						.authenticationEntryPoint(problemHandler)
+						.accessDeniedHandler(problemHandler))
 				.build();
 	}
 

@@ -1,6 +1,9 @@
 package br.dev.lucasaguiar.mecano.auth.presentation;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -51,7 +54,10 @@ class AuthIntegrationTest {
 								{"name": "Outro", "email": "outro@mecano.local",
 								 "password": "outro-password", "role": "ADMIN"}
 								"""))
-				.andExpect(status().isForbidden());
+				.andExpect(status().isForbidden())
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+				.andExpect(jsonPath("$.status").value(403))
+				.andExpect(jsonPath("$.detail").value("Seu perfil não tem permissão para esta operação."));
 	}
 
 	@Test
@@ -68,7 +74,15 @@ class AuthIntegrationTest {
 	@Test
 	void adminApisRequireToken() throws Exception {
 		mockMvc.perform(post("/api/admin/users").contentType(MediaType.APPLICATION_JSON).content("{}"))
-				.andExpect(status().isUnauthorized());
+				.andExpect(status().isUnauthorized())
+				.andExpect(header().string("WWW-Authenticate", "Bearer"))
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+				.andExpect(jsonPath("$.instance").value("/api/admin/users"))
+				.andExpect(jsonPath("$.detail").value("Autenticação necessária: informe um token válido no "
+						+ "cabeçalho Authorization (Bearer)."));
+		mockMvc.perform(get("/api/admin/customers").header("Authorization", "Bearer token-invalido"))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.status").value(401));
 	}
 
 	private String login(String email, String password) throws Exception {
