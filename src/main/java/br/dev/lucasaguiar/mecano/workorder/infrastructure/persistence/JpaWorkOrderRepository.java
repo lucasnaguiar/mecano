@@ -80,6 +80,11 @@ public class JpaWorkOrderRepository implements WorkOrderRepository {
 	}
 
 	@Override
+	public Page<WorkOrder> findOngoing(PageQuery query) {
+		return Pages.toPage(springDataRepository.findOngoing(Pages.toPageable(query)), JpaWorkOrderRepository::toDomain);
+	}
+
+	@Override
 	public boolean hasOpenWorkOrder(VehicleId vehicleId) {
 		return springDataRepository.existsByVehicleIdAndStatusNot(vehicleId.value(), WorkOrderStatus.DELIVERED);
 	}

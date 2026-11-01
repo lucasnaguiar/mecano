@@ -113,6 +113,9 @@ class WorkOrderFlowIntegrationTest extends ApiIntegrationTest {
 
 		perform(get("/api/admin/work-orders").param("status", "DELIVERED"))
 				.andExpect(jsonPath("$.content[*].id", Matchers.hasItem(id)));
+		perform(get("/api/admin/work-orders/ongoing").param("size", "100"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.content[*].id", Matchers.not(Matchers.hasItem(id))));
 		perform(get("/api/admin/reports/average-execution-time"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.averageSeconds").isNumber());
@@ -166,6 +169,9 @@ class WorkOrderFlowIntegrationTest extends ApiIntegrationTest {
 				{"customerId": "%s", "vehicleId": "%s", "problemDescription": "Barulho na suspensão"}
 				""".formatted(customerId, vehicleId)), "$.id");
 
+		perform(get("/api/admin/work-orders/ongoing").param("size", "100"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.content[*].id", Matchers.hasItem(id)));
 		perform(get("/api/admin/customers/" + customerId + "/work-orders"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.totalElements").value(1))

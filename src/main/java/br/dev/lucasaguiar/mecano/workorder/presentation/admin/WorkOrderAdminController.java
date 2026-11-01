@@ -12,6 +12,7 @@ import br.dev.lucasaguiar.mecano.workorder.application.AddPartUseCase;
 import br.dev.lucasaguiar.mecano.workorder.application.CompleteWorkOrderUseCase;
 import br.dev.lucasaguiar.mecano.workorder.application.DeliverVehicleUseCase;
 import br.dev.lucasaguiar.mecano.workorder.application.GetWorkOrderUseCase;
+import br.dev.lucasaguiar.mecano.workorder.application.ListOngoingWorkOrdersUseCase;
 import br.dev.lucasaguiar.mecano.workorder.application.ListWorkOrdersUseCase;
 import br.dev.lucasaguiar.mecano.workorder.application.OpenWorkOrderUseCase;
 import br.dev.lucasaguiar.mecano.workorder.application.RemoveLaborItemUseCase;
@@ -62,6 +63,7 @@ public class WorkOrderAdminController {
 	private final DeliverVehicleUseCase deliverVehicleUseCase;
 	private final GetWorkOrderUseCase getWorkOrderUseCase;
 	private final ListWorkOrdersUseCase listWorkOrdersUseCase;
+	private final ListOngoingWorkOrdersUseCase listOngoingWorkOrdersUseCase;
 
 	public WorkOrderAdminController(OpenWorkOrderUseCase openWorkOrderUseCase,
 			StartDiagnosisUseCase startDiagnosisUseCase, AddLaborUseCase addLaborUseCase,
@@ -69,7 +71,7 @@ public class WorkOrderAdminController {
 			RemovePartItemUseCase removePartItemUseCase, SendEstimateUseCase sendEstimateUseCase,
 			StartExecutionUseCase startExecutionUseCase, CompleteWorkOrderUseCase completeWorkOrderUseCase,
 			DeliverVehicleUseCase deliverVehicleUseCase, GetWorkOrderUseCase getWorkOrderUseCase,
-			ListWorkOrdersUseCase listWorkOrdersUseCase) {
+			ListWorkOrdersUseCase listWorkOrdersUseCase, ListOngoingWorkOrdersUseCase listOngoingWorkOrdersUseCase) {
 		this.openWorkOrderUseCase = openWorkOrderUseCase;
 		this.startDiagnosisUseCase = startDiagnosisUseCase;
 		this.addLaborUseCase = addLaborUseCase;
@@ -82,6 +84,7 @@ public class WorkOrderAdminController {
 		this.deliverVehicleUseCase = deliverVehicleUseCase;
 		this.getWorkOrderUseCase = getWorkOrderUseCase;
 		this.listWorkOrdersUseCase = listWorkOrdersUseCase;
+		this.listOngoingWorkOrdersUseCase = listOngoingWorkOrdersUseCase;
 	}
 
 	@PostMapping
@@ -97,6 +100,14 @@ public class WorkOrderAdminController {
 	public PageResponse<WorkOrderResponse> list(@RequestParam(required = false) WorkOrderStatus status,
 			PageParams pageParams) {
 		return PageResponse.from(listWorkOrdersUseCase.execute(status, pageParams.toQuery()), WorkOrderResponse::from);
+	}
+
+	@GetMapping("/ongoing")
+	@Operation(summary = "Fila de OS em andamento",
+			description = "Em execução, aguardando aprovação, em diagnóstico e recebidas, nessa ordem; dentro de cada "
+					+ "status, das mais antigas para as mais recentes. Finalizadas e entregues ficam de fora.")
+	public PageResponse<WorkOrderResponse> ongoing(PageParams pageParams) {
+		return PageResponse.from(listOngoingWorkOrdersUseCase.execute(pageParams.toQuery()), WorkOrderResponse::from);
 	}
 
 	@GetMapping("/{id}")

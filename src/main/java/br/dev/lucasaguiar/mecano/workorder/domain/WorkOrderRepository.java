@@ -27,6 +27,12 @@ public interface WorkOrderRepository {
 	/** Lista as OS do veículo, das mais recentes para as mais antigas. */
 	Page<WorkOrder> findByVehicle(VehicleId vehicleId, PageQuery query);
 
+	/**
+	 * Lista as OS em andamento por prioridade de status (em execução, aguardando aprovação, em diagnóstico e
+	 * recebida) e, dentro de cada status, das mais antigas para as mais recentes. Finalizadas e entregues ficam de fora.
+	 */
+	Page<WorkOrder> findOngoing(PageQuery query);
+
 	/** Indica se o veículo já tem uma OS ainda não entregue. */
 	boolean hasOpenWorkOrder(VehicleId vehicleId);
 

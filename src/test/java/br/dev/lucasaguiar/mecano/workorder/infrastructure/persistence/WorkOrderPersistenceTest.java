@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @PersistenceTest
@@ -108,6 +109,29 @@ class WorkOrderPersistenceTest {
 		assertThat(workOrders.findAverageExecutionTimeInSeconds()).isNull();
 	}
 
+	@Test
+	void listsOngoingWorkOrdersByStatusPriorityAndThenOldestFirst() {
+		var received = save(workOrder(WorkOrderStatus.RECEIVED, NOW.minusSeconds(400)));
+		var newerInProgress = save(workOrder(WorkOrderStatus.IN_PROGRESS, NOW.minusSeconds(100)));
+		var diagnosis = save(workOrder(WorkOrderStatus.IN_DIAGNOSIS, NOW.minusSeconds(300)));
+		var olderInProgress = save(workOrder(WorkOrderStatus.IN_PROGRESS, NOW.minusSeconds(200)));
+		var awaiting = save(workOrder(WorkOrderStatus.AWAITING_APPROVAL, NOW.minusSeconds(500)));
+		save(workOrder(WorkOrderStatus.COMPLETED, NOW.minusSeconds(600)));
+		save(workOrder(WorkOrderStatus.DELIVERED, NOW.minusSeconds(700)));
+
+		var page = workOrders.findOngoing(PageRequest.of(0, 10));
+
+		assertThat(page.getContent()).extracting(WorkOrderEntity::getId)
+				.containsExactly(olderInProgress, newerInProgress, awaiting, diagnosis, received);
+		assertThat(page.getTotalElements()).isEqualTo(5);
+		assertThat(workOrders.findOngoing(PageRequest.of(1, 2)).getContent()).extracting(WorkOrderEntity::getId)
+				.containsExactly(awaiting, diagnosis);
+	}
+
+	private UUID save(WorkOrderEntity workOrder) {
+		return workOrders.saveAndFlush(workOrder).getId();
+	}
+
 	private void saveCompleted(Duration executionTime) {
 		var workOrder = workOrder(WorkOrderStatus.COMPLETED);
 		workOrder.getStatusTransitions().add(
@@ -118,8 +142,12 @@ class WorkOrderPersistenceTest {
 	}
 
 	private WorkOrderEntity workOrder(WorkOrderStatus status) {
+		return workOrder(status, NOW);
+	}
+
+	private WorkOrderEntity workOrder(WorkOrderStatus status, Instant createdAt) {
 		return new WorkOrderEntity(UUID.randomUUID(), null, UUID.randomUUID().toString().replace("-", ""),
-				customerId, vehicleId, status, "Barulho no motor", null, BigDecimal.ZERO, null, NOW, NOW,
+				customerId, vehicleId, status, "Barulho no motor", null, BigDecimal.ZERO, null, createdAt, createdAt,
 				new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
 	}
 

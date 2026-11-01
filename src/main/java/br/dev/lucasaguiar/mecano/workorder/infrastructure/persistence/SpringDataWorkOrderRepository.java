@@ -20,6 +20,22 @@ interface SpringDataWorkOrderRepository extends JpaRepository<WorkOrderEntity, U
 
 	Page<WorkOrderEntity> findByVehicleId(UUID vehicleId, Pageable pageable);
 
+	/** OS em andamento ordenadas pela prioridade do status e, dentro dele, pela data de abertura. */
+	@Query(value = """
+			SELECT w FROM WorkOrderEntity w
+			WHERE w.status IN (IN_PROGRESS, AWAITING_APPROVAL, IN_DIAGNOSIS, RECEIVED)
+			ORDER BY CASE w.status
+			  WHEN IN_PROGRESS THEN 0
+			  WHEN AWAITING_APPROVAL THEN 1
+			  WHEN IN_DIAGNOSIS THEN 2
+			  ELSE 3
+			END, w.createdAt, w.id
+			""", countQuery = """
+			SELECT COUNT(w) FROM WorkOrderEntity w
+			WHERE w.status IN (IN_PROGRESS, AWAITING_APPROVAL, IN_DIAGNOSIS, RECEIVED)
+			""")
+	Page<WorkOrderEntity> findOngoing(Pageable pageable);
+
 	boolean existsByVehicleIdAndStatusNot(UUID vehicleId, WorkOrderStatus status);
 
 	/**
