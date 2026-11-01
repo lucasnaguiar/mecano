@@ -37,3 +37,6 @@ build/
 
 ### Sistema operacional ###
 .DS_Store
+
+### Cliente HTTP do IntelliJ (credenciais locais) ###
+http-client.private.env.json
