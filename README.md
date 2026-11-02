@@ -77,6 +77,7 @@ Diagramas (mapa de contextos, agregados, estados da OS, sequência da aprovaçã
 - springdoc-openapi 3 (Swagger UI)
 - JUnit 5, Mockito, Testcontainers 2 e JaCoCo
 - Docker e Docker Compose
+- Trivy (análise de vulnerabilidades)
 
 ## Pré-requisitos
 
@@ -149,6 +150,10 @@ Cobertura: o JaCoCo bloqueia o build se os domínios críticos (`workorder.domai
 `shared.domain`) ficarem abaixo de 80% de linhas. Na versão atual, os pacotes de domínio estão entre 99% e 100%, e
 o projeto inteiro em 93%. Relatório em `target/site/jacoco/index.html`.
 
+Análise de vulnerabilidades: feita com o Trivy nas dependências, na imagem Docker, no Dockerfile e em busca de
+segredos. Resultado, correções e comandos para reproduzir em
+[docs/seguranca/analise-vulnerabilidades.md](docs/seguranca/analise-vulnerabilidades.md).
+
 ## Swagger
 
 - Swagger UI: `http://localhost:8080/swagger-ui.html`
@@ -195,7 +200,8 @@ OS recebida, em diagnóstico, aguardando aprovação, em execução, entregue e 
 .
 ├── docs/
 │   ├── api/                        fluxo completo para o cliente HTTP do IntelliJ
-│   └── ddd/                        linguagem ubíqua, diagramas e event storming
+│   ├── ddd/                        linguagem ubíqua, diagramas e event storming
+│   └── seguranca/                  análise de vulnerabilidades
 ├── src/main/java/br/dev/lucasaguiar/mecano/
 │   ├── workorder/                  Ordem de Serviço (subdomínio principal)
 │   │   ├── domain/                 WorkOrder, itens, orçamento, status e eventos
