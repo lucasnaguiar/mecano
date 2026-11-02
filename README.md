@@ -3,6 +3,9 @@
 Back-end do sistema integrado de atendimento e execução de serviços de uma oficina mecânica. MVP desenvolvido para
 o Tech Challenge da pós-graduação SOAT (fase 1).
 
+> O enunciado do Tech Challenge não define um nome para o sistema. O nome **Mecano** foi dado ao projeto porque ter
+> um nome próprio ajuda a idealizar a solução e a se referir a ela durante o desenvolvimento e na documentação.
+
 ## Objetivo
 
 Organizar o atendimento da oficina de ponta a ponta: da chegada do veículo à entrega ao cliente, passando por
