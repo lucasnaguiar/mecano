@@ -20,8 +20,9 @@ import org.springdoc.core.customizers.GlobalOpenApiCustomizer;
 import org.springframework.stereotype.Component;
 
 /**
- * Documenta as respostas de erro (formato ProblemDetail) em todas as operações, com exemplos em português, sem
- * repetir anotações em cada controller. As regras de 403 acompanham as de SecurityConfig.
+ * Documenta as respostas de erro (formato ProblemDetail, incluindo o 429 do RateLimitFilter) em todas as
+ * operações, com exemplos em português, sem repetir anotações em cada controller. As regras de 403 acompanham as
+ * de SecurityConfig.
  */
 @Component
 class ErrorResponsesCustomizer implements GlobalOpenApiCustomizer {
@@ -71,6 +72,11 @@ class ErrorResponsesCustomizer implements GlobalOpenApiCustomizer {
 							+ "está \"Recebida\" e precisa estar \"Em diagnóstico\".", path),
 					"estoque insuficiente", problem(422, "Estoque insuficiente de \"Filtro de óleo\": disponível 5 UN, "
 							+ "necessário 6 UN.", path)));
+		}
+		if (path.equals("/api/auth/login") || path.startsWith("/api/customer/")) {
+			add(operation, 429, "Muitas requisições do mesmo IP; aguarde o tempo indicado em Retry-After", Map.of(
+					"limite atingido", problem(429, "Muitas tentativas. Aguarde 42 segundos e tente novamente.",
+							path)));
 		}
 	}
 

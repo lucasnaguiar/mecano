@@ -50,11 +50,15 @@ class OpenApiIntegrationTest extends ApiIntegrationTest {
 				.andExpect(jsonPath("$.paths['/api/admin/parts'].post.responses['403']").exists())
 				.andExpect(jsonPath("$.paths['/api/admin/parts'].get.responses['403']").doesNotExist())
 				.andExpect(jsonPath("$.paths['/api/auth/login'].post.responses['401'].description")
-						.value("E-mail ou senha inválidos"));
+						.value("E-mail ou senha inválidos"))
+				.andExpect(jsonPath("$.paths['/api/auth/login'].post.responses['429']").exists())
+				.andExpect(jsonPath(cancel + "['429']").doesNotExist());
 		mockMvc.perform(get("/v3/api-docs/cliente"))
 				.andExpect(jsonPath("$.paths['/api/customer/work-orders/{trackingCode}'].get.responses['401']")
 						.doesNotExist())
 				.andExpect(jsonPath("$.paths['/api/customer/work-orders/{trackingCode}'].get.responses['404']")
+						.exists())
+				.andExpect(jsonPath("$.paths['/api/customer/work-orders/{trackingCode}'].get.responses['429']")
 						.exists());
 	}
 }

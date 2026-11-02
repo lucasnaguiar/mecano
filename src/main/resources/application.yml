@@ -22,6 +22,14 @@ app:
       name: ${ADMIN_NAME:Administrador}
       email: ${ADMIN_EMAIL:}
       password: ${ADMIN_PASSWORD:}
+  # Limite por IP nos endpoints públicos (proteção contra força bruta).
+  rate-limit:
+    login:
+      max-requests: ${RATE_LIMIT_LOGIN:10}
+      window: PT1M
+    tracking:
+      max-requests: ${RATE_LIMIT_TRACKING:30}
+      window: PT1M
 
 management:
   endpoints:
@@ -74,3 +82,9 @@ app:
   security:
     jwt:
       secret: test-secret-only-for-automated-tests-0123456789
+  # Os testes fazem muitos logins a partir do mesmo IP; RateLimitIntegrationTest usa limites próprios.
+  rate-limit:
+    login:
+      max-requests: 100000
+    tracking:
+      max-requests: 100000
