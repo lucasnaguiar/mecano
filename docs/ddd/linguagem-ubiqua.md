@@ -22,6 +22,10 @@ Regras de nomenclatura no código:
 
 A tradução de cada termo do negócio para o código está definida neste documento e não deve ser alterada sem atualizá-lo.
 
+Documentos relacionados: [diagramas](diagramas.md) (mapa de contextos, agregados, estados da OS, sequência da aprovação e modelo de dados) e [Event Storming](event-storming.md).
+
+Sumário: [Mapa de contextos](#mapa-de-contextos) · [Termos por contexto](#contexto-ordem-de-serviço-workorder) · [Blocos táticos](#blocos-táticos-por-contexto) · [Atores](#atores) · [Comandos e eventos](#comandos-e-eventos) · [Consultas](#consultas-modelos-de-leitura) · [Políticas](#políticas) · [Regras de negócio](#regras-de-negócio) · [Glossário](#glossário) · [Relação com o código](#relação-com-o-código) · [Decisões](#decisões-tomadas)
+
 ---
 
 ## Mapa de contextos
@@ -159,7 +163,9 @@ RECEIVED | IN_DIAGNOSIS | AWAITING_APPROVAL → CANCELED
 
 Regras:
 
-- Não existe cadastro público de usuário. Apenas `ADMIN` cadastra usuários da equipe.
+- Não existe cadastro público de usuário. Apenas `ADMIN` cadastra, lista, altera o perfil, desativa e reativa usuários da equipe.
+- Ninguém altera o próprio perfil nem desativa o próprio usuário, e a oficina sempre mantém ao menos um `ADMIN` ativo.
+- Usuário desativado não faz login e recebe a mesma mensagem de credenciais inválidas; o histórico dele nas OS e no estoque é mantido.
 - Credenciais inválidas sempre geram a mesma mensagem ("E-mail ou senha inválidos."), sem indicar qual dos dois está errado.
 
 ---
@@ -178,6 +184,23 @@ Regras:
 
 ---
 
+## Blocos táticos por contexto
+
+Resumo dos elementos de DDD de cada contexto. Agregados se referenciam apenas pelo ID tipado; entidades internas só existem dentro do seu agregado e são gravadas junto com ele.
+
+| Contexto | Agregados (raiz) | Entidades | Objetos de valor | Eventos de domínio |
+|---|---|---|---|---|
+| Ordem de Serviço | `WorkOrder` | `LaborItem`, `PartItem`, `Estimate`, `StatusTransition` (internas à OS) | `WorkOrderId`, `TrackingCode`, `RequiredPart`; enums `WorkOrderStatus`, `EstimateStatus` | `WorkOrderOpened`, `DiagnosisStarted`, `LaborAdded`, `PartAdded`, `EstimateSent`, `EstimateApproved`, `EstimateRejected`, `ExecutionStarted`, `WorkOrderCompleted`, `VehicleDelivered`, `WorkOrderCanceled` |
+| Estoque | `Part` | `StockMovement` (extrato, gravado à parte) | `PartId`; enums `PartType`, `StockMovementType` | `PartRegistered`, `StockEntryRegistered`, `PartPriceChanged`, `PartsReserved`, `StockDecreased`, `ReservationReleased`, `MinimumStockReached` |
+| Catálogo | `LaborOperation` | — | `LaborOperationId` | — |
+| Cliente | `Customer`, `Vehicle` | — | `CustomerId`, `VehicleId` | `CustomerRegistered`, `VehicleRegistered` |
+| Autenticação | `User` | — | `AccessToken`; enum `Role` | — |
+| Compartilhado | — | — | `Money`, `Quantity`, `UnitOfMeasure`, `TaxId`, `LicensePlate`, `ModelYear`, `UserId` | — |
+
+`RequiredPart` é o par peça e quantidade levado pelos eventos `EstimateApproved`, `ExecutionStarted` e `WorkOrderCanceled` para a política de estoque.
+
+---
+
 ## Atores
 
 | Ator | Código (perfil) | Responsabilidades |
@@ -185,10 +208,10 @@ Regras:
 | Atendente | `ATTENDANT` | Identifica o cliente, cadastra veículos, abre a OS, envia o orçamento e entrega o veículo |
 | Mecânico | `MECHANIC` | Faz o diagnóstico, inclui serviços e peças, executa e finaliza a OS |
 | Gestor de estoque | `STOCK_MANAGER` | Cadastra peças e insumos, registra entradas e altera preços |
-| Administração | `ADMIN` | Gerencia usuários e catálogo e acompanha indicadores, como o tempo médio de execução |
-| Cliente | — | Acompanha a OS e aprova ou rejeita o orçamento pelo código de acompanhamento |
+| Administração | `ADMIN` | Gerencia usuários e catálogo, acompanha indicadores (tempo médio de execução) e tem todas as permissões da equipe |
+| Cliente | — | Acompanha a OS e aprova ou rejeita o orçamento pelo código de acompanhamento, sem login |
 
-> Os perfis acima são uma proposta. Se atendente e gestor de estoque forem a mesma pessoa na oficina, os perfis podem ser unificados.
+O controle de acesso aplica os perfis assim: usuários e indicadores exigem `ADMIN`; alterações no catálogo exigem `ADMIN`; alterações no estoque exigem `ADMIN` ou `STOCK_MANAGER`; as demais rotas da equipe (clientes, veículos e OS) aceitam qualquer perfil autenticado, e a divisão entre atendente e mecânico acima é a responsabilidade esperada de cada um.
 
 ---
 
@@ -198,8 +221,14 @@ Regras:
 |---|---|---|---|---|
 | Fazer login | `Login` | Equipe | `User` | — |
 | Cadastrar usuário | `RegisterUser` | Administração | `User` | — |
+| Alterar perfil do usuário | `ChangeUserRole` | Administração | `User` | — |
+| Desativar / reativar usuário | `DeactivateUser`, `ActivateUser` | Administração | `User` | — |
 | Cadastrar cliente | `RegisterCustomer` | Atendente | `Customer` | Cliente Cadastrado (`CustomerRegistered`) |
+| Alterar / remover cliente | `UpdateCustomer`, `DeleteCustomer` | Atendente | `Customer` | — |
 | Cadastrar veículo | `RegisterVehicle` | Atendente | `Vehicle` | Veículo Cadastrado (`VehicleRegistered`) |
+| Alterar / remover veículo | `UpdateVehicle`, `DeleteVehicle` | Atendente | `Vehicle` | — |
+| Cadastrar serviço no catálogo | `RegisterLaborOperation` | Administração | `LaborOperation` | — |
+| Alterar / desativar serviço | `UpdateLaborOperation`, `DeactivateLaborOperation` | Administração | `LaborOperation` | — |
 | Abrir ordem de serviço | `OpenWorkOrder` | Atendente | `WorkOrder` | Ordem de Serviço Aberta (`WorkOrderOpened`) |
 | Iniciar diagnóstico | `StartDiagnosis` | Mecânico | `WorkOrder` | Diagnóstico Iniciado (`DiagnosisStarted`) |
 | Incluir serviço | `AddLabor` | Mecânico | `WorkOrder` | Serviço Incluído (`LaborAdded`) |
@@ -215,12 +244,24 @@ Regras:
 | Cadastrar peça ou insumo | `RegisterPart` | Gestor de estoque | `Part` | Peça Cadastrada (`PartRegistered`) |
 | Registrar entrada | `RegisterStockEntry` | Gestor de estoque | `Part` | Entrada Registrada (`StockEntryRegistered`) |
 | Alterar preço | `ChangePartPrice` | Gestor de estoque | `Part` | Preço Alterado (`PartPriceChanged`) |
+| Alterar / desativar peça ou insumo | `UpdatePart`, `DeactivatePart` | Gestor de estoque | `Part` | — |
 | Reservar peças | `ReserveParts` | Política | `Part` | Peças Reservadas (`PartsReserved`) |
 | Baixar estoque | `DecreaseStock` | Política | `Part` | Estoque Baixado (`StockDecreased`) |
 | Liberar reserva | `ReleaseReservation` | Política | `Part` | Reserva Liberada (`ReservationReleased`) |
 | Verificar estoque mínimo | `CheckMinimumStock` | Política | `Part` | Estoque Mínimo Atingido (`MinimumStockReached`) |
 
 **Eventos pivotais**, que marcam as grandes fases do atendimento: Ordem de Serviço Aberta, Orçamento Enviado, Orçamento Aprovado, OS Finalizada e Veículo Entregue.
+
+## Consultas (modelos de leitura)
+
+| Consulta | Código | Quem usa | O que retorna |
+|---|---|---|---|
+| Acompanhar OS | `TrackWorkOrder` | Cliente | Status, itens, orçamento e etapas da OS pelo código de acompanhamento, sem dados internos |
+| Fila de OS em andamento | `ListOngoingWorkOrders` | Equipe | Em execução, aguardando aprovação, em diagnóstico e recebidas, nessa ordem e das mais antigas para as mais recentes; finalizadas, entregues e canceladas ficam de fora |
+| Histórico do cliente / do veículo | `ListCustomerWorkOrders`, `ListVehicleWorkOrders` | Equipe | OS do cliente ou do veículo, das mais recentes para as mais antigas |
+| Listar OS, clientes, peças | `ListWorkOrders`, `ListCustomers`, `ListParts` | Equipe | Listagens paginadas, com filtros por status, CPF/CNPJ e estoque mínimo |
+| Extrato do item | `ListStockMovements` | Equipe | Movimentações de estoque do item, das mais recentes para as mais antigas |
+| Tempo médio de execução | `GetAverageExecutionTime` | Administração | Média entre o início da execução e a finalização |
 
 ## Políticas
 
@@ -238,6 +279,32 @@ As políticas reagem aos eventos de forma síncrona, na mesma transação do com
 
 ---
 
+## Regras de negócio
+
+Regras consolidadas, com o ponto do código em que cada uma é garantida.
+
+| Regra | Onde é garantida |
+|---|---|
+| A OS só muda de status pelos comandos do ciclo, na ordem definida | `WorkOrder` (domínio) |
+| Serviços e peças só entram ou saem da OS em diagnóstico | `WorkOrder` |
+| O orçamento só é enviado com ao menos um serviço ou peça; observações em branco mantêm as anteriores | `WorkOrder.sendEstimate` |
+| Há no máximo um orçamento pendente por OS e ele só é respondido uma vez | `Estimate` e índice único parcial no banco |
+| A execução só começa com o orçamento aprovado | `WorkOrder.startExecution` |
+| A aprovação reserva as peças; sem estoque suficiente, é recusada e nada é gravado | `WorkOrderStockPolicy`, `Part.reserve` (mesma transação) |
+| O início da execução baixa as peças reservadas | `WorkOrderStockPolicy`, `Part.decrease` |
+| O cancelamento é só da equipe, com motivo, antes da execução; libera a reserva se o orçamento estava aprovado | `WorkOrder.cancel`, `WorkOrderStockPolicy` |
+| Um veículo tem no máximo uma OS aberta (nem entregue nem cancelada) | `OpenWorkOrderUseCase` |
+| O veículo da OS precisa pertencer ao cliente informado | `OpenWorkOrderUseCase` |
+| Preço e descrição de serviços e peças são copiados para a OS na inclusão | `LaborItem`, `PartItem` |
+| Serviço ou peça inativos não podem ser incluídos em OS | `LaborOperation`, `Part` |
+| Peça (`PART`) é sempre em unidade (`UN`) e sem fração; insumo aceita até 3 casas decimais | `Part`, `Quantity`, `UnitOfMeasure` |
+| CPF/CNPJ, placa, código da peça, nome do serviço e e-mail do usuário são únicos | casos de uso de cadastro e `UNIQUE` no banco |
+| Cliente com veículos e veículo com OS não podem ser removidos | `DeleteCustomerUseCase` e chaves estrangeiras |
+| Valores monetários e quantidades nunca são negativos | `Money`, `Quantity` e `CHECK` no banco |
+| Usuário não altera o próprio perfil nem se desativa; sempre há um `ADMIN` ativo | `UserAdministration` |
+
+---
+
 ## Termos que exigem cuidado
 
 | Evite | Use | Motivo |
@@ -249,6 +316,47 @@ As políticas reagem aos eventos de forma síncrona, na mesma transação do com
 | "Peça" para tudo do estoque | **Peça** ou **insumo**, conforme o tipo | Insumos têm quantidade fracionada e unidade de medida própria. |
 | "Cancelar orçamento" | **Rejeitar orçamento** (cliente) ou **cancelar a OS** (equipe) | Rejeição é uma decisão do cliente e devolve a OS ao diagnóstico. Cancelamento encerra a OS e é feito só pela equipe. |
 | "Fechar OS" | **Finalizar** (`COMPLETED`) ou **entregar** (`DELIVERED`) | São dois momentos diferentes do atendimento. |
+
+---
+
+## Glossário
+
+Principais termos do domínio, em ordem alfabética.
+
+| Termo | Código | Definição |
+|---|---|---|
+| Atendente | `ATTENDANT` | Pessoa da equipe que recebe o cliente, abre a OS, envia o orçamento e entrega o veículo. |
+| Baixa | `decrease` | Saída definitiva de peças reservadas do estoque. |
+| Cancelamento | `CancelWorkOrder` | Encerramento da OS pela equipe antes da execução, com motivo obrigatório. |
+| Catálogo | `catalog` | Conjunto de serviços oferecidos pela oficina, com preço e tempo estimado. |
+| Cliente | `Customer` | Pessoa física ou jurídica dona do veículo atendido. |
+| Código de acompanhamento | `TrackingCode` | Código que dá ao cliente acesso à própria OS, sem login. |
+| Diagnóstico | `IN_DIAGNOSIS` | Etapa em que o mecânico define serviços e peças necessários. |
+| Entrada | `RegisterStockEntry` | Recebimento de novas unidades de um item no estoque. |
+| Entrega | `DeliverVehicle` | Devolução do veículo ao cliente; encerra o atendimento. |
+| Estoque mínimo | `minimumStock` | Quantidade a partir da qual o item precisa ser reposto. |
+| Fila de OS em andamento | `ListOngoingWorkOrders` | Lista de trabalho da oficina, ordenada pela prioridade do status. |
+| Finalização | `CompleteWorkOrder` | Conclusão dos serviços; o veículo fica pronto para retirada. |
+| Início da execução | `StartExecution` | Momento em que o mecânico começa o serviço aprovado; as peças reservadas são baixadas. |
+| Insumo | `Part` (`SUPPLY`) | Item de estoque consumido em quantidade fracionada (ex.: óleo em litros). |
+| Item de peça | `PartItem` | Peça ou insumo incluído na OS, com preço copiado na inclusão. |
+| Item de serviço | `LaborItem` | Serviço do catálogo incluído na OS, com preço copiado na inclusão. |
+| Liberação de reserva | `releaseReservation` | Devolução de peças reservadas ao disponível, no cancelamento de OS aprovada. |
+| Mecânico | `MECHANIC` | Pessoa da equipe que diagnostica, executa e finaliza a OS. |
+| Movimentação de estoque | `StockMovement` | Registro de cada entrada, reserva, liberação ou baixa de um item. |
+| Orçamento | `Estimate` | Proposta de valor enviada ao cliente para aprovação. |
+| Ordem de Serviço (OS) | `WorkOrder` | Registro do atendimento de um veículo, da entrada à entrega. |
+| Peça | `Part` (`PART`) | Item de estoque vendido por unidade e instalado no veículo. |
+| Perfil | `Role` | Conjunto de permissões de um usuário da equipe. |
+| Política | `*Policy` | Reação automática a um evento de domínio (ex.: reservar peças na aprovação). |
+| Recusa (rejeição) do orçamento | `RejectEstimate` | Decisão do cliente de não aprovar; a OS volta ao diagnóstico. |
+| Reserva | `reserve` | Separação de peças do estoque para uma OS com orçamento aprovado. |
+| Serviço do catálogo | `LaborOperation` | Trabalho oferecido pela oficina (ex.: troca de óleo). |
+| Status da OS | `WorkOrderStatus` | Etapa em que a OS se encontra no ciclo de atendimento. |
+| Tempo médio de execução | `GetAverageExecutionTime` | Indicador da média entre o início da execução e a finalização. |
+| Transição de status | `StatusTransition` | Registro de uma mudança de status, com data, hora e responsável. |
+| Usuário | `User` | Pessoa da equipe que acessa o sistema; não confundir com cliente. |
+| Veículo | `Vehicle` | Carro de um cliente atendido pela oficina, identificado pela placa. |
 
 ---
 
@@ -277,9 +385,14 @@ Caminhos relativos a `src/main/java/br/dev/lucasaguiar/mecano/`.
 | Usuário | `auth/domain/User.java` · tabela `app_user` | Implementado |
 | Login e cadastro de usuário | `auth/application/LoginUseCase.java`, `RegisterUserUseCase.java` | Implementado |
 | Token de acesso | `auth/application/AccessToken.java`, `auth/infrastructure/security/JwtTokenProvider.java` | Implementado |
+| Gestão de usuários | `auth/application/ChangeUserRoleUseCase.java`, `DeactivateUserUseCase.java`, `ActivateUserUseCase.java`, `UserAdministration.java` | Implementado |
+| Cancelamento de OS | `WorkOrder.cancel`, `workorder/application/CancelWorkOrderUseCase.java`, `workorder/domain/event/WorkOrderCanceled.java` | Implementado |
+| Consultas e fila de OS | `workorder/application/ListOngoingWorkOrdersUseCase.java`, `ListCustomerWorkOrdersUseCase.java`, `ListVehicleWorkOrdersUseCase.java`, `TrackWorkOrderUseCase.java` | Implementado |
 | Objetos de valor | `shared/domain/` | Implementado |
-
 | Políticas entre contextos | `workorder/application/WorkOrderStockPolicy.java`, `CustomerNotificationPolicy.java`, `inventory/application/MinimumStockAlertPolicy.java` | Implementado |
+| Contextos delimitados | `<contexto>/package-info.java` (`@ApplicationModule`) · verificação em `src/test/.../ModularityTests.java` | Implementado |
+| Comandos expostos na API | `*/presentation/` (controllers REST; rotas em `/api/admin` para a equipe e `/api/customer` para o cliente) | Implementado |
+
 Legenda: **Implementado**, com regras e testes; **Esqueleto**, a classe existe, mas sem regras; **Planejado**, ainda não existe no código.
 
 Termos ainda planejados: envio real de e-mail nas notificações.
