@@ -38,7 +38,8 @@ A tradução de cada termo do negócio para o código está definida neste docum
 Relações entre contextos:
 
 - `workorder` **consulta** `customer`, `catalog` e `inventory` para montar a OS, guardando apenas IDs e cópias de preço.
-- `inventory` **reage** aos eventos `EstimateApproved`, `ExecutionStarted` e `WorkOrderCanceled`, publicados por `workorder`.
+- `workorder` **aciona** `inventory`: a política de estoque da OS reage aos próprios eventos (`EstimateApproved`, `ExecutionStarted` e `WorkOrderCanceled`) e pede ao estoque a reserva, a baixa ou a liberação. O estoque não conhece a OS além do ID, então a dependência entre os dois contextos é só `workorder` -> `inventory`.
+- As dependências entre contextos são verificadas pelo Spring Modulith (`ModularityTests`): cada contexto publica só os pacotes que os outros podem usar, e o build falha se surgir dependência circular.
 - Nenhum contexto de negócio depende de `auth`. Quando precisa saber quem executou uma ação, guarda apenas o ID do usuário (`UserId`, que fica em `shared` justamente para isso).
 
 ---
@@ -278,7 +279,7 @@ Caminhos relativos a `src/main/java/br/dev/lucasaguiar/mecano/`.
 | Token de acesso | `auth/application/AccessToken.java`, `auth/infrastructure/security/JwtTokenProvider.java` | Implementado |
 | Objetos de valor | `shared/domain/` | Implementado |
 
-| Políticas entre contextos | `inventory/application/WorkOrderStockPolicy.java`, `MinimumStockAlertPolicy.java`, `workorder/application/CustomerNotificationPolicy.java` | Implementado |
+| Políticas entre contextos | `workorder/application/WorkOrderStockPolicy.java`, `CustomerNotificationPolicy.java`, `inventory/application/MinimumStockAlertPolicy.java` | Implementado |
 Legenda: **Implementado**, com regras e testes; **Esqueleto**, a classe existe, mas sem regras; **Planejado**, ainda não existe no código.
 
 Termos ainda planejados: envio real de e-mail nas notificações.
@@ -296,7 +297,7 @@ Termos ainda planejados: envio real de e-mail nas notificações.
 | Quem envia o orçamento? | A equipe (atendente), por comando explícito ao fim do diagnóstico. |
 | A execução começa automaticamente na aprovação? | Não. O mecânico inicia a execução depois que o cliente aprova. |
 | Falta de estoque na aprovação | Bloqueia a aprovação, com mensagem indicando o item, o disponível e o necessário. |
-| Reserva e baixa ocorrem na mesma transação da OS? | Sim, por eventos de domínio tratados de forma síncrona: o estoque reage a `EstimateApproved` (reserva) e `ExecutionStarted` (baixa). |
+| Reserva e baixa ocorrem na mesma transação da OS? | Sim, por eventos de domínio tratados de forma síncrona: a política de estoque da OS reage a `EstimateApproved` (reserva), `ExecutionStarted` (baixa) e `WorkOrderCanceled` (liberação) e aciona o estoque. |
 | Peça e insumo no mesmo agregado? | Sim: `Part` com `PartType`. A diferença está na unidade de medida e na aceitação de fração. |
 | Como o cliente se identifica? | Pelo código de acompanhamento (`TrackingCode`), sem login. |
 | Existe cancelamento de OS? | Sim, só pela equipe e antes da execução: status `CANCELED` (Cancelada), motivo obrigatório, orçamento pendente encerrado como `CANCELED` e reserva liberada se o orçamento estava aprovado. A OS cancelada não conta como aberta nem entra no tempo médio de execução. |

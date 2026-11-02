@@ -1,5 +1,6 @@
-package br.dev.lucasaguiar.mecano.inventory.application;
+package br.dev.lucasaguiar.mecano.workorder.application;
 
+import br.dev.lucasaguiar.mecano.inventory.application.WorkOrderStockUseCase;
 import br.dev.lucasaguiar.mecano.inventory.domain.PartId;
 import br.dev.lucasaguiar.mecano.shared.domain.Quantity;
 import br.dev.lucasaguiar.mecano.workorder.domain.event.EstimateApproved;
@@ -14,8 +15,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * Políticas "Reservar peças" (orçamento aprovado), "Baixar peças" (execução iniciada) e "Liberar reserva" (OS
- * cancelada com orçamento aprovado). Os listeners são síncronos e
- * rodam na transação da OS: se o estoque for insuficiente, a aprovação é desfeita e o cliente recebe o motivo.
+ * cancelada com orçamento aprovado). Ficam no contexto da OS, que aciona o estoque pelo WorkOrderStockUseCase: a
+ * dependência entre os contextos é só workorder -> inventory. Os listeners são síncronos e rodam na transação da OS:
+ * se o estoque for insuficiente, a aprovação é desfeita e o cliente recebe o motivo.
  */
 @Component
 class WorkOrderStockPolicy {

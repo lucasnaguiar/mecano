@@ -15,8 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Reserva, baixa e libera as peças de uma ordem de serviço. Chamado pelas políticas que reagem aos eventos da OS, na mesma
- * transação: se faltar estoque, a operação da OS também é desfeita.
+ * Reserva, baixa e libera as peças de uma ordem de serviço. Chamado pela política de estoque do contexto da OS, na
+ * mesma transação: se faltar estoque, a operação da OS também é desfeita.
  */
 @Service
 public class WorkOrderStockUseCase {
