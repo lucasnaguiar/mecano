@@ -1,14 +1,12 @@
 ### Fluxo completo de atendimento da oficina
 #
 # Executável no cliente HTTP do IntelliJ (selecione o ambiente "local" de http-client.env.json).
-# Pré-requisitos:
-#   - aplicação no ar com o perfil demo (SPRING_PROFILES_ACTIVE=local,demo), que cria atendente, mecânico e
-#     gestor de estoque com a senha DEMO_PASSWORD;
-#   - senha do administrador (ADMIN_PASSWORD do .env) em docs/api/http-client.private.env.json, fora do git:
-#     {"local": {"adminPassword": "..."}}
+# Todas as chamadas da equipe usam o usuário administrador (admin@mecano.local / admin-mecano, padrão da execução
+# local). Se você trocou o ADMIN_PASSWORD, informe-o em docs/api/http-client.private.env.json, fora do git:
+# {"local": {"adminPassword": "..."}}
 # O cliente e o veículo usam CPF e placa fixos: rode em uma base nova (docker compose down -v) ou troque os valores.
 #
-# Etapas: login da equipe > cadastros > abertura > diagnóstico > orçamento > aprovação pelo cliente > execução >
+# Etapas: login > cadastros > abertura > diagnóstico > orçamento > aprovação pelo cliente > execução >
 # finalização > entrega > consultas e indicadores > erros esperados.
 
 ### 1. Login do administrador
@@ -19,31 +17,7 @@ Content-Type: application/json
 
 > {% client.global.set("adminToken", response.body.accessToken); %}
 
-### 2. Login da atendente
-POST {{baseUrl}}/api/auth/login
-Content-Type: application/json
-
-{"email": "atendente@mecano.local", "password": "{{demoPassword}}"}
-
-> {% client.global.set("attendantToken", response.body.accessToken); %}
-
-### 3. Login do mecânico
-POST {{baseUrl}}/api/auth/login
-Content-Type: application/json
-
-{"email": "mecanico@mecano.local", "password": "{{demoPassword}}"}
-
-> {% client.global.set("mechanicToken", response.body.accessToken); %}
-
-### 4. Login do gestor de estoque
-POST {{baseUrl}}/api/auth/login
-Content-Type: application/json
-
-{"email": "estoque@mecano.local", "password": "{{demoPassword}}"}
-
-> {% client.global.set("stockToken", response.body.accessToken); %}
-
-### 5. Administrador cadastra um serviço no catálogo
+### 2. Cadastra um serviço no catálogo
 POST {{baseUrl}}/api/admin/labor-operations
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
@@ -53,9 +27,9 @@ Content-Type: application/json
 
 > {% client.global.set("laborOperationId", response.body.id); %}
 
-### 6. Gestor de estoque cadastra um insumo
+### 3. Cadastra um insumo (controlado em litros)
 POST {{baseUrl}}/api/admin/parts
-Authorization: Bearer {{stockToken}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"code": "FLUIDO-DOT4", "name": "Fluido de freio DOT 4", "type": "SUPPLY", "unitOfMeasure": "L",
@@ -63,34 +37,34 @@ Content-Type: application/json
 
 > {% client.global.set("partId", response.body.id); %}
 
-### 7. Gestor de estoque registra a entrada de 10 litros
+### 4. Registra a entrada de 10 litros no estoque
 POST {{baseUrl}}/api/admin/parts/{{partId}}/entries
-Authorization: Bearer {{stockToken}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"quantity": 10}
 
-### 8. Atendente cadastra o cliente (CPF com ou sem pontuação)
+### 5. Cadastra o cliente (CPF com ou sem pontuação)
 POST {{baseUrl}}/api/admin/customers
-Authorization: Bearer {{attendantToken}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"name": "Luiza Fernandes", "taxId": "714.602.389-31", "email": "luiza@email.com", "phone": "(11) 97777-6655"}
 
 > {% client.global.set("customerId", response.body.id); %}
 
-### 9. Atendente cadastra o veículo do cliente (placa Mercosul)
+### 6. Cadastra o veículo do cliente (placa Mercosul)
 POST {{baseUrl}}/api/admin/vehicles
-Authorization: Bearer {{attendantToken}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"customerId": "{{customerId}}", "licensePlate": "LUZ-4F21", "brand": "Renault", "model": "Kwid", "modelYear": 2022}
 
 > {% client.global.set("vehicleId", response.body.id); %}
 
-### 10. Atendente abre a ordem de serviço (status Recebida)
+### 7. Abre a ordem de serviço (status Recebida)
 POST {{baseUrl}}/api/admin/work-orders
-Authorization: Bearer {{attendantToken}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"customerId": "{{customerId}}", "vehicleId": "{{vehicleId}}", "problemDescription": "Pedal do freio baixo"}
@@ -100,27 +74,27 @@ Content-Type: application/json
     client.test("OS recebida", () => client.assert(response.body.status === "RECEIVED"));
 %}
 
-### 11. Mecânico inicia o diagnóstico
+### 8. Inicia o diagnóstico (status Em diagnóstico)
 POST {{baseUrl}}/api/admin/work-orders/{{workOrderId}}/diagnosis
-Authorization: Bearer {{mechanicToken}}
+Authorization: Bearer {{adminToken}}
 
-### 12. Mecânico inclui o serviço do catálogo
+### 9. Inclui o serviço do catálogo
 POST {{baseUrl}}/api/admin/work-orders/{{workOrderId}}/labor-items
-Authorization: Bearer {{mechanicToken}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"laborOperationId": "{{laborOperationId}}"}
 
-### 13. Mecânico inclui 1,5 litro de fluido
+### 10. Inclui 1,5 litro de fluido
 POST {{baseUrl}}/api/admin/work-orders/{{workOrderId}}/part-items
-Authorization: Bearer {{mechanicToken}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"partId": "{{partId}}", "quantity": 1.5}
 
-### 14. Atendente envia o orçamento ao cliente (status Aguardando aprovação)
+### 11. Envia o orçamento ao cliente (status Aguardando aprovação)
 POST {{baseUrl}}/api/admin/work-orders/{{workOrderId}}/estimate
-Authorization: Bearer {{attendantToken}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"diagnosisNotes": "Fluido contaminado; recomendada a troca completa"}
@@ -130,74 +104,67 @@ Content-Type: application/json
     client.test("orçamento pendente", () => client.assert(response.body.status === "AWAITING_APPROVAL"));
 %}
 
-### 15. Cliente consulta a OS pelo código de acompanhamento (sem login)
+### 12. Cliente consulta a OS pelo código de acompanhamento (sem login)
 GET {{baseUrl}}/api/customer/work-orders/{{trackingCode}}
 
-### 16. Cliente aprova o orçamento: as peças são reservadas no estoque
+### 13. Cliente aprova o orçamento: as peças são reservadas no estoque
 POST {{baseUrl}}/api/customer/work-orders/{{trackingCode}}/approval
 
-### 17. Estoque mostra 1,5 litro reservado
+### 14. Estoque mostra 1,5 litro reservado
 GET {{baseUrl}}/api/admin/parts/{{partId}}
-Authorization: Bearer {{stockToken}}
+Authorization: Bearer {{adminToken}}
 
 > {% client.test("reserva feita", () => client.assert(response.body.reservedQuantity === 1.5)); %}
 
-### 18. Mecânico inicia a execução (status Em execução): a reserva é baixada
+### 15. Inicia a execução (status Em execução): a reserva é baixada
 POST {{baseUrl}}/api/admin/work-orders/{{workOrderId}}/execution
-Authorization: Bearer {{mechanicToken}}
+Authorization: Bearer {{adminToken}}
 
-### 19. Fila da oficina: em execução primeiro, depois aguardando aprovação, diagnóstico e recebidas
+### 16. Fila da oficina: em execução primeiro, depois aguardando aprovação, diagnóstico e recebidas
 GET {{baseUrl}}/api/admin/work-orders/ongoing?page=0&size=20
-Authorization: Bearer {{attendantToken}}
+Authorization: Bearer {{adminToken}}
 
-### 20. Mecânico finaliza o serviço (status Finalizada)
+### 17. Finaliza o serviço (status Finalizada)
 POST {{baseUrl}}/api/admin/work-orders/{{workOrderId}}/completion
-Authorization: Bearer {{mechanicToken}}
+Authorization: Bearer {{adminToken}}
 
-### 21. Atendente entrega o veículo (status Entregue)
+### 18. Entrega o veículo (status Entregue)
 POST {{baseUrl}}/api/admin/work-orders/{{workOrderId}}/delivery
-Authorization: Bearer {{attendantToken}}
+Authorization: Bearer {{adminToken}}
 
 > {% client.test("OS entregue", () => client.assert(response.body.status === "DELIVERED")); %}
 
-### 22. Extrato do insumo: entrada, reserva e baixa
+### 19. Extrato do insumo: entrada, reserva e baixa
 GET {{baseUrl}}/api/admin/parts/{{partId}}/movements
-Authorization: Bearer {{stockToken}}
+Authorization: Bearer {{adminToken}}
 
-### 23. Histórico de OS do cliente e do veículo
+### 20. Histórico de OS do cliente e do veículo
 GET {{baseUrl}}/api/admin/customers/{{customerId}}/work-orders
-Authorization: Bearer {{attendantToken}}
+Authorization: Bearer {{adminToken}}
 
 ###
 GET {{baseUrl}}/api/admin/vehicles/{{vehicleId}}/work-orders
-Authorization: Bearer {{attendantToken}}
+Authorization: Bearer {{adminToken}}
 
-### 24. Administrador consulta o tempo médio de execução
+### 21. Tempo médio de execução
 GET {{baseUrl}}/api/admin/reports/average-execution-time
 Authorization: Bearer {{adminToken}}
 
 ### Erros esperados
 
-### 25. Sem token: 401
+### 22. Sem token: 401
 GET {{baseUrl}}/api/admin/work-orders
 
-### 26. Mecânico tentando cadastrar peça: 403
-POST {{baseUrl}}/api/admin/parts
-Authorization: Bearer {{mechanicToken}}
-Content-Type: application/json
-
-{"code": "X", "name": "X", "type": "PART", "unitOfMeasure": "UN", "unitPrice": 1, "minimumStock": 0}
-
-### 27. CPF inválido: 400
+### 23. CPF inválido: 400
 POST {{baseUrl}}/api/admin/customers
-Authorization: Bearer {{attendantToken}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"name": "Teste", "taxId": "111.111.111-11"}
 
-### 28. Cancelar uma OS já entregue: 422
+### 24. Cancelar uma OS já entregue: 422
 POST {{baseUrl}}/api/admin/work-orders/{{workOrderId}}/cancellation
-Authorization: Bearer {{attendantToken}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"reason": "Teste de regra"}

@@ -1,10 +1,12 @@
+# Sobe o ambiente completo sem configuração: os valores padrão abaixo são só para uso local.
+# Para trocar algum, copie .env.example para .env e ajuste.
 services:
   postgres:
     image: postgres:17-alpine
     environment:
       POSTGRES_DB: ${DB_NAME:-mecano}
-      POSTGRES_USER: ${DB_USERNAME:?defina DB_USERNAME no .env}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env}
+      POSTGRES_USER: ${DB_USERNAME:-mecano}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mecano}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
@@ -21,17 +23,17 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local,demo}
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-mecano}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env}
+      DB_USERNAME: ${DB_USERNAME:-mecano}
+      DB_PASSWORD: ${DB_PASSWORD:-mecano}
+      JWT_SECRET: ${JWT_SECRET:-mecano-segredo-local-somente-para-desenvolvimento}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-PT1H}
       ADMIN_NAME: ${ADMIN_NAME:-Administrador}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@mecano.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin-mecano}
       DEMO_PASSWORD: ${DEMO_PASSWORD:-demo-mecano}
       RATE_LIMIT_LOGIN: ${RATE_LIMIT_LOGIN:-10}
       RATE_LIMIT_TRACKING: ${RATE_LIMIT_TRACKING:-30}

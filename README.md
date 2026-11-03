@@ -29,7 +29,9 @@ Funcionalidades principais:
   cancelamento libera a reserva. Sem estoque suficiente, a aprovação é recusada com o motivo.
 - **Consultas**: fila de OS em andamento ordenada por prioridade (em execução, aguardando aprovação, em diagnóstico,
   recebida), histórico por cliente e por veículo, listagens paginadas e tempo médio de execução.
-- **Equipe**: perfis `ADMIN`, `ATTENDANT`, `MECHANIC` e `STOCK_MANAGER`, com gestão de usuários pelo administrador.
+- **Acesso da equipe**: API administrativa protegida por JWT. O sistema tem perfis de administrador, atendente,
+  mecânico e gestor de estoque (detalhes na [linguagem ubíqua](docs/ddd/linguagem-ubiqua.md)); para usar e testar,
+  basta o administrador, que tem acesso a todas as operações.
 
 Ciclo de vida da OS:
 
@@ -85,55 +87,74 @@ Diagramas (mapa de contextos, agregados, estados da OS, sequência da aprovaçã
 ## Pré-requisitos
 
 - **Com Docker** (recomendado): Docker com o plugin Compose.
-- **Execução local**: JDK 25 e um PostgreSQL acessível. O Maven não precisa estar instalado (o projeto usa o Maven
-  Wrapper).
+- **Aplicação pelo Maven**: JDK 25 e um PostgreSQL acessível (o do `docker compose up -d postgres` serve). O Maven
+  não precisa estar instalado: o projeto usa o Maven Wrapper.
 - **Testes**: JDK 25 e Docker rodando (os testes de integração sobem um PostgreSQL com Testcontainers).
 
 ## Execução
 
-### Com Docker Compose
+O projeto roda localmente **sem nenhuma configuração**: o `docker-compose.yml` e o perfil `local` já trazem valores
+padrão para banco, segredo do JWT e administrador. Esses valores servem só para a máquina local (ver
+[Variáveis de ambiente](#variáveis-de-ambiente)).
+
+### Opção 1: tudo com Docker Compose (recomendado)
+
+Requer apenas o Docker.
 
 ```bash
-cp .env.example .env
-# edite o .env: DB_PASSWORD, JWT_SECRET (mínimo de 32 caracteres) e ADMIN_PASSWORD
 docker compose up --build
 ```
 
-A aplicação sobe em `http://localhost:8080` depois que o banco fica saudável e aplica as migrations na primeira
-execução. O serviço `app` tem healthcheck em `/actuator/health/readiness`.
+- Sobe o PostgreSQL e a aplicação; na primeira execução, o Flyway cria as tabelas, o administrador é criado
+  e o perfil `demo` cadastra dados de exemplo (catálogo, estoque, clientes, veículos e OS).
+- A aplicação fica pronta em `http://localhost:8080` quando o serviço `app` aparece como `healthy` em
+  `docker compose ps` (health check em `/actuator/health/readiness`).
+- Swagger: `http://localhost:8080/swagger-ui.html`. Usuários em
+  [Credenciais de demonstração](#credenciais-de-demonstração).
+- Para parar: `docker compose down`. Para recomeçar com a base vazia: `docker compose down -v`.
+- Se as portas 8080 ou 5432 já estiverem em uso, troque com `APP_PORT=8081 DB_PORT=5433 docker compose up --build`.
 
-Para popular a base com dados de demonstração, defina `SPRING_PROFILES_ACTIVE=local,demo` no `.env` antes de subir.
-Para recomeçar do zero, use `docker compose down -v`.
+### Opção 2: aplicação pelo Maven, banco pelo Docker
 
-### Local (sem Docker para a aplicação)
+Requer JDK 25 e Docker. Útil para desenvolver e depurar pela IDE.
 
 ```bash
-export $(grep -v '^#' .env | xargs)    # carrega as variáveis do .env
-./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+docker compose up -d postgres                                        # só o banco, em localhost:5432
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local,demo         # aplicação em localhost:8080
 ```
 
-Variáveis de ambiente (todas descritas no `.env.example`):
+O perfil `local` usa os mesmos valores padrão do compose, então não é preciso exportar variáveis. No IntelliJ, basta
+rodar a classe `MecanoApplication` com os perfis ativos `local,demo`.
 
-| Variável | Uso |
-|---|---|
-| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` | Conexão com o PostgreSQL |
-| `JWT_SECRET`, `JWT_EXPIRATION` | Assinatura e validade do token (padrão `PT1H`) |
-| `ADMIN_NAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Administrador criado na primeira subida |
-| `SPRING_PROFILES_ACTIVE` | `local`; acrescente `demo` para os dados de demonstração |
-| `DEMO_PASSWORD` | Senha dos usuários de demonstração |
-| `RATE_LIMIT_LOGIN`, `RATE_LIMIT_TRACKING` | Requisições por minuto e por IP no login e na consulta do cliente |
-| `APP_PORT` | Porta publicada pelo Docker Compose |
+Se o JDK padrão da máquina não for o 25, aponte o `JAVA_HOME` antes, por exemplo
+`export JAVA_HOME=~/.sdkman/candidates/java/25.0.3-amzn`.
+
+### Variáveis de ambiente
+
+Todas são opcionais na execução local. Para alterar alguma, copie o `.env.example` para `.env` (lido
+automaticamente pelo Docker Compose) ou exporte a variável antes do `./mvnw`.
+
+| Variável | Padrão local | Uso |
+|---|---|---|
+| `SPRING_PROFILES_ACTIVE` | `local,demo` | Perfis ativos; sem `demo`, a base sobe vazia, só com o administrador |
+| `DB_HOST`, `DB_PORT`, `DB_NAME` | `localhost`, `5432`, `mecano` | Endereço do PostgreSQL (no compose, a aplicação usa o host `postgres`) |
+| `DB_USERNAME`, `DB_PASSWORD` | `mecano`, `mecano` | Usuário e senha do PostgreSQL |
+| `JWT_SECRET` | segredo de desenvolvimento | Assinatura dos tokens (mínimo de 32 caracteres) |
+| `JWT_EXPIRATION` | `PT1H` | Validade do token |
+| `ADMIN_NAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` | `Administrador`, `admin@mecano.local`, `admin-mecano` | Administrador criado na primeira subida |
+| `RATE_LIMIT_LOGIN`, `RATE_LIMIT_TRACKING` | `10`, `30` | Requisições por minuto e por IP no login e na consulta do cliente |
+| `APP_PORT` | `8080` | Porta da aplicação publicada pelo compose |
+
+Os padrões existem só no `docker-compose.yml` e no perfil `local`. Fora dele (em um servidor, por exemplo), banco,
+`JWT_SECRET` e senha do administrador precisam ser informados, com valores próprios.
 
 ### Fluxo completo
 
-O arquivo [docs/api/fluxo-completo.http](docs/api/fluxo-completo.http) percorre o atendimento inteiro (logins,
-cadastros, abertura, diagnóstico, orçamento, aprovação pelo cliente, execução, entrega, consultas e erros
-esperados) e pode ser executado pelo cliente HTTP do IntelliJ. Ele pressupõe o perfil `demo` e uma base nova; a
-senha do administrador vai em `docs/api/http-client.private.env.json` (ignorado pelo git):
-
-```json
-{"local": {"adminPassword": "a mesma senha de ADMIN_PASSWORD"}}
-```
+O arquivo [docs/api/fluxo-completo.http](docs/api/fluxo-completo.http) percorre o atendimento inteiro com o
+administrador (login, cadastros, abertura, diagnóstico, orçamento, aprovação pelo cliente, execução, entrega,
+consultas e erros esperados) e pode ser executado pelo cliente HTTP do IntelliJ, com o ambiente `local`. Ele
+pressupõe uma base nova (`docker compose down -v` antes), porque usa CPF e placa fixos. Se você trocou o `ADMIN_PASSWORD`, informe a nova senha em
+`docs/api/http-client.private.env.json` (ignorado pelo git): `{"local": {"adminPassword": "..."}}`.
 
 ## Testes
 
@@ -187,15 +208,18 @@ O schema é versionado pelo Flyway (`src/main/resources/db/migration`) e o Hiber
 
 ## Credenciais de demonstração
 
-| Usuário | Perfil | Senha |
-|---|---|---|
-| `ADMIN_EMAIL` do `.env` (padrão `admin@mecano.local`) | `ADMIN` | `ADMIN_PASSWORD` do `.env` |
-| `atendente@mecano.local` | `ATTENDANT` | `DEMO_PASSWORD` (padrão `demo-mecano`) |
-| `mecanico@mecano.local` | `MECHANIC` | `DEMO_PASSWORD` |
-| `estoque@mecano.local` | `STOCK_MANAGER` | `DEMO_PASSWORD` |
+| Usuário | Senha |
+|---|---|
+| `admin@mecano.local` | `admin-mecano` |
 
-Os três últimos só existem com o perfil `demo`, que também cria catálogo, estoque, quatro clientes, seis veículos e
-OS recebida, em diagnóstico, aguardando aprovação, em execução, entregue e cancelada. O código de acompanhamento de cada OS aparece no campo `trackingCode` das rotas da equipe.
+É o administrador criado na primeira subida, com os valores padrão locais (`ADMIN_EMAIL` e `ADMIN_PASSWORD`); se
+você alterou algum no `.env`, use o valor alterado. Com ele, faça `POST /api/auth/login` e use o `accessToken` nas
+rotas `/api/admin/**`. O perfil `demo` também cria usuários dos demais perfis (`atendente`, `mecanico` e
+`estoque@mecano.local`, senha `demo-mecano`), que não são necessários para testar o sistema.
+
+O perfil `demo` cadastra catálogo, estoque, quatro clientes, seis veículos e OS recebida, em diagnóstico, aguardando
+aprovação, em execução, entregue e cancelada. O código de acompanhamento de cada OS aparece no campo `trackingCode`
+das rotas da equipe e é o que o cliente usa nas rotas `/api/customer/**`, sem login.
 
 ## Estrutura de diretórios
 
